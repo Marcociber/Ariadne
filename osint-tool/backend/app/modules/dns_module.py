@@ -30,6 +30,19 @@ class DNSModule(OSINTModule):
 
     RECORD_TYPES = ["A", "AAAA", "MX", "NS", "TXT", "SOA", "CAA"]
 
+    # Known TXT verification tokens -> human-readable owner (real, from the record).
+    TXT_VERIFICATIONS = {
+        "google-site-verification=": "Domain verification (Google)",
+        "ms=": "Domain verification (Microsoft)",
+        "facebook-domain-verification=": "Domain verification (Facebook/Meta)",
+        "apple-domain-verification=": "Domain verification (Apple)",
+        "atlassian-domain-verification=": "Domain verification (Atlassian)",
+        "stripe-verification=": "Domain verification (Stripe)",
+        "docusign=": "Domain verification (DocuSign)",
+        "adobe-idp-site-verification=": "Domain verification (Adobe)",
+        "shopify-verification-code=": "Domain verification (Shopify)",
+    }
+
     def _resolver(self) -> dns.asyncresolver.Resolver:
         r = dns.asyncresolver.Resolver()
         r.lifetime = 5.0
@@ -42,12 +55,62 @@ class DNSModule(OSINTModule):
             for rdata in answers:
                 val = str(rdata).strip('"')
                 label, cat = f"Record {rtype}", "dns"
-                # Tag SPF inside TXT (anti-spoofing policy).
-                if rtype == "TXT" and val.lower().startswith("v=spf1"):
-                    label, cat = "SPF", "email_security"
+                if rtype == "TXT":
+                    low = val.lower()
+                    # Tag SPF inside TXT (anti-spoofing policy).
+                    if low.startswith("v=spf1"):
+                        label, cat = "SPF", "email_security"
+                    else:
+                        # Relabel known service-verification tokens.
+                        for prefix, name in self.TXT_VERIFICATIONS.items():
+                            if low.startswith(prefix):
+                                label, cat = name, "verification"
+                                break
                 findings.append(Finding(label=label, value=val, category=cat))
         except _DNS_ERRORS:
             pass
+        return findings
+
+    async def _query_email_security(self, domain: str) -> list[Finding]:
+        """MTA-STS, TLS-RPT and BIMI presence (email hardening / brand signals)."""
+        findings: list[Finding] = []
+        checks = [
+            (f"_mta-sts.{domain}", "v=stsv1", "MTA-STS", "Enabled (enforced TLS policy)", "email_security"),
+            (f"_smtp._tls.{domain}", "v=tlsrptv1", "TLS-RPT", "Enabled (TLS reporting)", "email_security"),
+            (f"default._bimi.{domain}", "v=bimi1", "BIMI", "Enabled (verified brand logo)", "email_security"),
+        ]
+        for name, needle, label, value, cat in checks:
+            try:
+                for rdata in await self._resolver().resolve(name, "TXT"):
+                    if str(rdata).strip('"').lower().startswith(needle):
+                        findings.append(Finding(label=label, value=value, category=cat, confidence=0.9))
+                        break
+            except _DNS_ERRORS:
+                pass
+        return findings
+
+    async def _query_dnssec(self, domain: str) -> list[Finding]:
+        """DNSKEY presence indicates the zone is DNSSEC-signed."""
+        try:
+            answers = await self._resolver().resolve(domain, "DNSKEY")
+            if answers:
+                return [Finding(label="DNSSEC", value="Signed zone (DNSKEY present)", category="dns", confidence=0.9)]
+        except _DNS_ERRORS:
+            pass
+        return []
+
+    async def _query_www(self, domain: str) -> list[Finding]:
+        """Resolve the common www.<domain> host (A/CNAME) — extra surface."""
+        findings: list[Finding] = []
+        for rt in ("A", "CNAME"):
+            try:
+                answers = await self._resolver().resolve(f"www.{domain}", rt)
+                for r in answers:
+                    findings.append(Finding(label=f"www ({rt})", value=str(r).rstrip("."), category="dns"))
+                if rt == "CNAME":
+                    break  # a CNAME precludes an A at the same name
+            except _DNS_ERRORS:
+                pass
         return findings
 
     async def _query_dmarc(self, domain: str) -> list[Finding]:
@@ -88,5 +151,8 @@ class DNSModule(OSINTModule):
         tasks = [self._query_record(target, rt) for rt in self.RECORD_TYPES]
         tasks.append(self._query_dmarc(target))
         tasks.append(self._reverse_dns(target))
+        tasks.append(self._query_email_security(target))
+        tasks.append(self._query_dnssec(target))
+        tasks.append(self._query_www(target))
         results = await asyncio.gather(*tasks)
         return [f for sub in results for f in sub]

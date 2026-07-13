@@ -42,10 +42,14 @@ class CrtShModule(OSINTModule):
             return []
 
         issuers: set[str] = set()
+        has_wildcard = False
         for entry in data:
             name_value = entry.get("name_value", "")
             for sub in name_value.split("\n"):
-                sub = sub.strip().lstrip("*.").lower()
+                raw = sub.strip().lower()
+                if raw.startswith("*."):
+                    has_wildcard = True
+                sub = raw.lstrip("*.")
                 if sub.endswith(target) and sub != target:
                     subdomains.add(sub)
             issuer = (entry.get("issuer_name") or "").strip()
@@ -57,6 +61,13 @@ class CrtShModule(OSINTModule):
             findings.append(Finding(
                 label="Subdomains found", value=str(len(subdomains)),
                 category="subdomain"))
+        findings.append(Finding(
+            label="Certificates (CT log entries)", value=str(len(data)),
+            category="cert"))
+        if has_wildcard:
+            findings.append(Finding(
+                label="Wildcard certificate", value="Yes (*.{} issued)".format(target),
+                category="cert", confidence=0.9))
         findings += [
             Finding(label="Subdomain", value=s, category="subdomain")
             for s in sorted(subdomains)

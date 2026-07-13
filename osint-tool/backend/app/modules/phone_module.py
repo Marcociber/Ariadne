@@ -134,6 +134,8 @@ class PhoneModule(OSINTModule):
             pivots.append(("Check on Telegram", f"https://t.me/+{digits}"))
         # Truecaller and web search apply to any valid number.
         pivots.append(("Check on Truecaller", f"https://www.truecaller.com/search/{region_code.lower() or 'intl'}/{national}"))
+        pivots.append(("Reverse lookup (Sync.me)", f"https://sync.me/search/?number={quote(e164)}"))
+        pivots.append(("Search on Facebook", f"https://www.facebook.com/search/top?q={quote(e164)}"))
         pivots.append(("Web search (E.164)", f"https://www.google.com/search?q={quote(chr(34) + e164 + chr(34))}"))
         pivots.append(("Web search (local format)", f"https://www.google.com/search?q={quote(chr(34) + national_fmt + chr(34))}"))
 

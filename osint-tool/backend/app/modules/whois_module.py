@@ -57,10 +57,26 @@ class WhoisModule(OSINTModule):
             add(label, value)
 
         add("Registrar", data.registrar)
+        add("Registrar URL", getattr(data, "registrar_url", None))
         add("WHOIS server", getattr(data, "whois_server", None))
         add_date("Creation date", data.creation_date)
         add_date("Updated date", getattr(data, "updated_date", None))
         add_date("Expiration date", data.expiration_date)
+
+        # Domain age: derived from the creation date (older domains are more
+        # established / less likely to be throwaway). Real, computed value.
+        created = data.creation_date
+        if isinstance(created, list):
+            created = created[0] if created else None
+        if isinstance(created, datetime):
+            try:
+                age_days = (datetime.now() - created.replace(tzinfo=None)).days
+                if age_days >= 0:
+                    years = age_days // 365
+                    rem = (age_days % 365) // 30
+                    add("Domain age", f"{years}y {rem}m ({age_days} days)")
+            except Exception:
+                pass
 
         # Días hasta expiración: dato derivado y fiable (o el dominio ya caducó).
         exp = data.expiration_date

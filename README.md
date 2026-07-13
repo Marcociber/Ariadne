@@ -24,12 +24,12 @@ Open-source intelligence dashboard that aggregates **multiple free sources** int
 
 | Target     | Module    | What it collects                                                                                      |
 |------------|-----------|--------------------------------------------------------------------------------------------------------|
-| Domain     | `dns`     | A, AAAA, MX, NS, TXT, **SOA, CAA** records; **DMARC** policy; labeled **SPF**; **Reverse DNS (PTR)**        |
-| Domain     | `whois`   | Registrar, WHOIS server, dates (creation/update/expiration), **days until expiration**, **EPP status**, **DNSSEC**, nameservers, registrant, location, emails |
-| Domain     | `crtsh`   | Subdomains via Certificate Transparency + **count** and **issuing CAs**                                  |
-| Email      | `email`   | Gravatar (avatar, name, **location, bio, links**), **known provider**, **MX**, **SPF/DMARC** of the domain |
+| Domain     | `dns`     | A, AAAA, MX, NS, TXT, **SOA, CAA** records; **DMARC** policy; labeled **SPF**; **Reverse DNS (PTR)**; **MTA-STS / TLS-RPT / BIMI**; **DNSSEC**; **www** host; recognized **service-verification tokens** (Google/Microsoft/Facebook/Stripe…) |
+| Domain     | `whois`   | Registrar (+ **URL**), WHOIS server, dates (creation/update/expiration), **days until expiration**, **domain age**, **EPP status**, **DNSSEC**, nameservers, registrant, location, emails |
+| Domain     | `crtsh`   | Subdomains via Certificate Transparency + **count**, **cert entries**, **wildcard detection** and **issuing CAs**            |
+| Email      | `email`   | **Address analysis** (valid format, role-based/disposable, Gmail canonical form, plus-tag), Gravatar (avatar, name, **location, bio, links**, MD5+**SHA-256**), **mail provider (MX)**, whether the domain **hosts a website**, **SPF/DMARC/MTA-STS**, and **pivots** (candidate username, web/GitHub search) |
 | Username   | `username`| Presence on 150+ platforms via **Maigret** (real detection) + **profile count**                        |
-| Phone      | `phone`   | Validity, formats (E.164/intl/national), country + **flag**, region, **carrier** (mobile only), timezone, line type, length, and **pivot links** (WhatsApp/Telegram/Truecaller/search) filtered by line type |
+| Phone      | `phone`   | Validity, formats (E.164/intl/national), country + **flag**, region, **carrier** (mobile only), timezone, line type, length, and **pivot links** (WhatsApp/Telegram/Truecaller/**Sync.me**/**Facebook**/search) filtered by line type |
 
 > **Key-based modules** (`shodan`, `hibp`) are already included as optional plugins — they activate automatically when you set their API key in `.env`. See [Optional key-based modules](#-optional-key-based-modules).
 
