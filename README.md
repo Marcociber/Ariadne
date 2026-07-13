@@ -143,6 +143,7 @@ That is all — the orchestrator detects it and uses it automatically.
 - [x] ~~Visual graph of entity relationships.~~ ✅
 - [x] ~~Maigret username module integration.~~ ✅
 - [x] ~~Target type selector + country code dropdown.~~ ✅
+- [x] ~~Searchable phone picker with image-based country flags + digits-only input.~~ ✅
 - [x] ~~Enhanced modules (DMARC/SPF/PTR, DNSSEC, CAs, phone pivots…).~~ ✅
 - [ ] Redis cache to avoid repeated queries.
 - [ ] Scan history in PostgreSQL.
