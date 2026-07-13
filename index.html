@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OSINT All-in-One</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #2f81f7;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922; --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 20px; }
+  header h1 { margin: 0 0 4px; font-size: 26px; }
+  header p { margin: 0 0 24px; color: var(--muted); font-size: 14px; }
+  .search-box { display: flex; gap: 10px; margin-bottom: 8px; }
+  input[type=text] {
+    flex: 1; padding: 12px 16px; font-size: 15px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 8px; color: var(--text); outline: none;
+  }
+  input[type=text]:focus { border-color: var(--accent); }
+  button {
+    padding: 12px 24px; font-size: 15px; font-weight: 600; background: var(--accent);
+    color: #fff; border: none; border-radius: 8px; cursor: pointer;
+  }
+  button:disabled { opacity: .6; cursor: not-allowed; }
+  .hint { font-size: 12px; color: var(--muted); margin-bottom: 24px; }
+  .meta { display: flex; gap: 16px; margin: 20px 0 12px; font-size: 13px; color: var(--muted); flex-wrap: wrap; align-items: center; }
+  .badge {
+    display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px;
+    font-weight: 600; background: rgba(47,129,247,.15); color: var(--accent);
+  }
+  /* Toggle de vistas */
+  .view-toggle { margin-left: auto; display: flex; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .view-toggle button {
+    background: var(--panel); color: var(--muted); padding: 6px 16px;
+    font-size: 13px; border-radius: 0; font-weight: 500;
+  }
+  .view-toggle button.active { background: var(--accent); color: #fff; }
+  /* Vista lista */
+  .module-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
+  .module-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .module-name { font-weight: 700; text-transform: uppercase; font-size: 13px; letter-spacing: .5px; }
+  .status { font-size: 12px; font-weight: 600; }
+  .status.ok { color: var(--green); } .status.empty { color: var(--muted); } .status.error { color: var(--red); }
+  .findings { padding: 6px 16px 14px; }
+  .finding { display: flex; gap: 10px; padding: 6px 0; font-size: 14px; border-bottom: 1px solid rgba(48,54,61,.5); }
+  .finding:last-child { border-bottom: none; }
+  .finding .label { color: var(--muted); min-width: 150px; }
+  .finding .value { word-break: break-all; }
+  .finding a { color: var(--accent); text-decoration: none; }
+  .cat { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(139,148,158,.15); color: var(--muted); align-self: center; }
+  .correlations { background: rgba(210,153,34,.08); border: 1px solid rgba(210,153,34,.3); border-radius: 10px; padding: 14px 16px; margin: 18px 0; }
+  .correlations h3 { margin: 0 0 8px; font-size: 14px; color: var(--yellow); }
+  .empty-state { text-align: center; color: var(--muted); padding: 40px; }
+  .spinner { width: 20px; height: 20px; border: 3px solid rgba(255,255,255,.2); border-top-color: #fff; border-radius: 50%; display: inline-block; animation: spin .8s linear infinite; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* Vista grafo */
+  #graph-wrap { position: relative; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  #graph { display: block; width: 100%; height: 560px; cursor: grab; }
+  #graph:active { cursor: grabbing; }
+  .graph-legend { position: absolute; top: 12px; left: 12px; background: rgba(13,17,23,.85); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 12px; }
+  .graph-legend div { display: flex; align-items: center; gap: 8px; margin: 3px 0; color: var(--muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .graph-tip { position: absolute; bottom: 12px; right: 12px; font-size: 11px; color: var(--muted); background: rgba(13,17,23,.85); padding: 4px 8px; border-radius: 6px; }
+  .node-tooltip { position: absolute; pointer-events: none; background: #000; border: 1px solid var(--accent); border-radius: 6px; padding: 6px 10px; font-size: 12px; max-width: 280px; word-break: break-all; display: none; z-index: 10; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🔍 OSINT All-in-One</h1>
+    <p>Dashboard de inteligencia de fuentes abiertas — versión gratuita, sin API keys</p>
+  </header>
+
+  <div class="search-box">
+    <input type="text" id="target" placeholder="dominio.com · email@dom.com · username · +34600000000"
+           onkeydown="if(event.key==='Enter')scan()" />
+    <button id="btn" onclick="scan()">Escanear</button>
+  </div>
+  <div class="hint">El tipo de objetivo (dominio, email, username, teléfono) se detecta automáticamente.</div>
+
+  <div id="results"></div>
+</div>
+
+<script>
+const API = "http://127.0.0.1:8000";
+let lastData = null;
+let currentView = "list";
+
+async function scan() {
+  const target = document.getElementById("target").value.trim();
+  if (!target) return;
+  const btn = document.getElementById("btn");
+  const results = document.getElementById("results");
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+  results.innerHTML = '<div class="empty-state">Consultando fuentes…</div>';
+  try {
+    const resp = await fetch(`${API}/scan`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ target }),
+    });
+    lastData = await resp.json();
+    renderAll();
+  } catch (e) {
+    results.innerHTML = `<div class="empty-state">Error al conectar con la API.<br>¿Está el backend corriendo en ${API}?</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "Escanear";
+  }
+}
+
+function renderAll() {
+  const data = lastData;
+  const results = document.getElementById("results");
+  let html = `<div class="meta">
+    <span>Objetivo: <span class="badge">${escapeHtml(data.target)}</span></span>
+    <span>Tipo: <span class="badge">${data.target_type}</span></span>
+    <span>Tiempo: ${data.total_elapsed_ms} ms</span>
+    <span class="view-toggle">
+      <button id="tab-list" class="${currentView==='list'?'active':''}" onclick="setView('list')">Lista</button>
+      <button id="tab-graph" class="${currentView==='graph'?'active':''}" onclick="setView('graph')">Grafo</button>
+    </span>
+  </div><div id="view-body"></div>`;
+  results.innerHTML = html;
+  if (currentView === "list") renderList(); else renderGraph();
+}
+
+function setView(v) { currentView = v; renderAll(); }
+
+/* ---------- VISTA LISTA ---------- */
+function renderList() {
+  const data = lastData;
+  const body = document.getElementById("view-body");
+  let html = "";
+  if (data.correlations && data.correlations.length) {
+    html += `<div class="correlations"><h3>⚡ Correlaciones detectadas</h3>`;
+    for (const c of data.correlations) {
+      html += `<div>${escapeHtml(c.description)}: <b>${c.linked_values.map(escapeHtml).join(", ")}</b>
+        <span class="cat">${c.modules.join(" + ")}</span></div>`;
+    }
+    html += `</div>`;
+  }
+  if (!data.results.length) html += `<div class="empty-state">No hay módulos para este tipo de objetivo.</div>`;
+  for (const r of data.results) {
+    html += `<div class="module-card"><div class="module-head">
+      <span class="module-name">${r.module}</span>
+      <span class="status ${r.status}">${statusLabel(r)}</span></div>`;
+    if (r.findings.length) {
+      html += `<div class="findings">`;
+      for (const f of r.findings) {
+        html += `<div class="finding"><span class="label">${escapeHtml(f.label)}</span>
+          <span class="value">${linkify(f.value)}</span><span class="cat">${f.category}</span></div>`;
+      }
+      html += `</div>`;
+    }
+    html += `</div>`;
+  }
+  body.innerHTML = html;
+}
+
+/* ---------- VISTA GRAFO (force-directed sobre canvas, sin librerías) ---------- */
+const MODULE_COLORS = {
+  dns:"#2f81f7", whois:"#3fb950", crtsh:"#bc8cff",
+  email:"#d29922", username:"#f85149", phone:"#39c5cf"
+};
+
+function buildGraph(data) {
+  const nodes = [], links = [];
+  const W = 900, H = 560;
+  // Nodo central: el objetivo
+  nodes.push({ id:"__target__", label:data.target, type:"target", x:W/2, y:H/2, r:26, color:"#fff" });
+
+  const correlated = new Set();
+  for (const c of (data.correlations||[]))
+    for (const v of c.linked_values) correlated.add(v.toLowerCase());
+
+  for (const res of data.results) {
+    if (!res.findings.length) continue;
+    const modId = "mod__" + res.module;
+    nodes.push({ id:modId, label:res.module, type:"module", r:16,
+      color: MODULE_COLORS[res.module]||"#8b949e",
+      x: W/2 + (Math.random()-.5)*200, y: H/2 + (Math.random()-.5)*200 });
+    links.push({ source:"__target__", target:modId, strong:true });
+
+    res.findings.forEach((f, i) => {
+      const fid = modId + "__" + i;
+      const isCorr = correlated.has((f.value||"").toLowerCase());
+      nodes.push({ id:fid, label:f.value, sub:f.label, type:"finding",
+        r: isCorr?9:6, color: isCorr ? "#d29922" : (MODULE_COLORS[res.module]||"#8b949e"),
+        corr:isCorr, x: W/2 + (Math.random()-.5)*400, y: H/2 + (Math.random()-.5)*400 });
+      links.push({ source:modId, target:fid, strong:false, corr:isCorr });
+    });
+  }
+  return { nodes, links, W, H };
+}
+
+let graphState = null;
+
+function renderGraph() {
+  const data = lastData;
+  const body = document.getElementById("view-body");
+  const hasFindings = data.results.some(r => r.findings.length);
+  if (!hasFindings) { body.innerHTML = `<div class="empty-state">No hay datos para graficar.</div>`; return; }
+
+  body.innerHTML = `
+    <div id="graph-wrap">
+      <canvas id="graph"></canvas>
+      <div class="graph-legend" id="legend"></div>
+      <div class="graph-tip">Arrastra los nodos · pasa el ratón para ver el valor</div>
+      <div class="node-tooltip" id="tooltip"></div>
+    </div>`;
+
+  const g = buildGraph(data);
+  const canvas = document.getElementById("graph");
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr; canvas.height = 560 * dpr;
+  const ctx = canvas.getContext("2d"); ctx.scale(dpr, dpr);
+  const VW = rect.width, VH = 560;
+  // Reescalar posiciones iniciales al ancho real
+  g.nodes.forEach(n => { n.x = n.x/g.W*VW; n.y = n.y/g.H*VH; n.vx=0; n.vy=0; });
+
+  // Leyenda
+  const mods = [...new Set(data.results.filter(r=>r.findings.length).map(r=>r.module))];
+  document.getElementById("legend").innerHTML =
+    `<div><span class="legend-dot" style="background:#fff"></span>Objetivo</div>` +
+    mods.map(m=>`<div><span class="legend-dot" style="background:${MODULE_COLORS[m]||'#8b949e'}"></span>${m}</div>`).join("") +
+    `<div><span class="legend-dot" style="background:#d29922"></span>correlacionado</div>`;
+
+  graphState = { g, canvas, ctx, VW, VH, drag:null, hover:null };
+  setupGraphInteraction();
+  runSimulation();
+}
+
+function runSimulation() {
+  const s = graphState; if (!s) return;
+  const { g, VW, VH } = s;
+  let ticks = 0;
+  function step() {
+    if (!graphState) return;
+    // Fuerzas: repulsión entre nodos + atracción de enlaces + centrado
+    for (const n of g.nodes) { if (n===s.drag) continue; n.fx=0; n.fy=0; }
+    for (let i=0;i<g.nodes.length;i++){
+      for (let j=i+1;j<g.nodes.length;j++){
+        const a=g.nodes[i], b=g.nodes[j];
+        let dx=a.x-b.x, dy=a.y-b.y, d=Math.hypot(dx,dy)||0.1;
+        const rep = 1400/(d*d);
+        const fx=dx/d*rep, fy=dy/d*rep;
+        a.fx+=fx; a.fy+=fy; b.fx-=fx; b.fy-=fy;
+      }
+    }
+    for (const l of g.links){
+      const a=g.nodes.find(n=>n.id===l.source), b=g.nodes.find(n=>n.id===l.target);
+      let dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||0.1;
+      const target = l.strong?90:55;
+      const k=(d-target)*0.02;
+      const fx=dx/d*k, fy=dy/d*k;
+      a.fx+=fx; a.fy+=fy; b.fx-=fx; b.fy-=fy;
+    }
+    for (const n of g.nodes){
+      if (n===s.drag) continue;
+      n.fx += (VW/2 - n.x)*0.005; n.fy += (VH/2 - n.y)*0.005;
+      n.vx=(n.vx+n.fx)*0.85; n.vy=(n.vy+n.fy)*0.85;
+      n.x+=n.vx; n.y+=n.vy;
+      n.x=Math.max(n.r, Math.min(VW-n.r, n.x));
+      n.y=Math.max(n.r, Math.min(VH-n.r, n.y));
+    }
+    drawGraph();
+    ticks++;
+    if (ticks < 500) requestAnimationFrame(step);
+  }
+  step();
+}
+
+function drawGraph() {
+  const s = graphState; if (!s) return;
+  const { ctx, g, VW, VH } = s;
+  ctx.clearRect(0,0,VW,VH);
+  // enlaces
+  for (const l of g.links){
+    const a=g.nodes.find(n=>n.id===l.source), b=g.nodes.find(n=>n.id===l.target);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+    ctx.strokeStyle = l.corr ? "rgba(210,153,34,.6)" : (l.strong?"rgba(139,148,158,.5)":"rgba(139,148,158,.2)");
+    ctx.lineWidth = l.strong?2:1; ctx.stroke();
+  }
+  // nodos
+  for (const n of g.nodes){
+    ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+    ctx.fillStyle=n.color; ctx.fill();
+    if (n.type==="target"){ ctx.lineWidth=3; ctx.strokeStyle="#2f81f7"; ctx.stroke(); }
+    if (n.corr){ ctx.lineWidth=2; ctx.strokeStyle="#fff"; ctx.stroke(); }
+    // etiqueta solo para target y módulos
+    if (n.type!=="finding"){
+      ctx.fillStyle="#e6edf3"; ctx.font=(n.type==="target"?"bold 13px":"12px")+" sans-serif";
+      ctx.textAlign="center";
+      const lbl = n.label.length>22 ? n.label.slice(0,22)+"…" : n.label;
+      ctx.fillText(lbl, n.x, n.y - n.r - 6);
+    }
+  }
+}
+
+function setupGraphInteraction() {
+  const s = graphState; const { canvas, g } = s;
+  const tooltip = document.getElementById("tooltip");
+  function pos(e){ const r=canvas.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; }
+  function nodeAt(p){ for (let i=g.nodes.length-1;i>=0;i--){ const n=g.nodes[i]; if (Math.hypot(n.x-p.x,n.y-p.y)<=n.r+3) return n; } return null; }
+
+  canvas.onmousedown = e => { const p=pos(e); const n=nodeAt(p); if (n){ s.drag=n; n.vx=0; n.vy=0; } };
+  canvas.onmousemove = e => {
+    const p=pos(e);
+    if (s.drag){ s.drag.x=p.x; s.drag.y=p.y; drawGraph(); }
+    const n=nodeAt(p);
+    if (n && n.type==="finding"){
+      tooltip.style.display="block"; tooltip.style.left=(p.x+12)+"px"; tooltip.style.top=(p.y+12)+"px";
+      tooltip.innerHTML = `<b>${escapeHtml(n.sub||"")}</b><br>${escapeHtml(n.label)}`;
+    } else tooltip.style.display="none";
+  };
+  canvas.onmouseup = () => { s.drag=null; runSimulation(); };
+  canvas.onmouseleave = () => { s.drag=null; tooltip.style.display="none"; };
+}
+
+/* ---------- helpers ---------- */
+function statusLabel(r){ if(r.status==="ok")return `${r.findings.length} resultados`; if(r.status==="empty")return "sin resultados"; return "error"; }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function linkify(v){ const safe=escapeHtml(v); if(/^https?:\/\//.test(v))return `<a href="${safe}" target="_blank" rel="noopener">${safe}</a>`; return safe; }
+</script>
+</body>
+</html>
