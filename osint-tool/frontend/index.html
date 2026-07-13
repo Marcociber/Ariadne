@@ -46,14 +46,38 @@
     border: 1px solid var(--border); border-radius: 8px; color: var(--text); outline: none;
   }
   input[type=text]:focus { border-color: var(--accent); }
-  /* Country code dropdown (phone only) */
-  #country-code {
+  /* Country code dropdown (phone only) — custom, with flag images */
+  .cc-dropdown { position: relative; flex: none; }
+  .cc-toggle {
+    display: flex; align-items: center; gap: 8px;
     padding: 12px 14px; font-size: 15px; background: var(--panel);
     border: 1px solid var(--border); border-radius: 8px; color: var(--text);
-    outline: none; cursor: pointer; max-width: 190px;
+    cursor: pointer; white-space: nowrap; min-width: 108px;
   }
-  #country-code:focus { border-color: var(--accent); }
-  #country-code option { background: var(--panel); color: var(--text); }
+  .cc-toggle:focus, .cc-dropdown.open .cc-toggle { border-color: var(--accent); }
+  .cc-flag { width: 22px; height: 16px; object-fit: cover; border-radius: 2px; flex: none; }
+  .cc-caret { margin-left: auto; color: var(--muted); font-size: 11px; }
+  .cc-menu {
+    position: absolute; top: calc(100% + 4px); left: 0; z-index: 30;
+    width: 300px; max-height: 320px; overflow-y: auto; padding: 6px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.45); display: none;
+  }
+  .cc-dropdown.open .cc-menu { display: block; }
+  .cc-search {
+    width: 100%; box-sizing: border-box; padding: 8px 10px; margin-bottom: 6px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-size: 14px; outline: none;
+  }
+  .cc-list { list-style: none; margin: 0; padding: 0; }
+  .cc-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+    border-radius: 6px; cursor: pointer; font-size: 14px; color: var(--text);
+  }
+  .cc-item:hover { background: rgba(47,129,247,.15); }
+  .cc-item .cc-name { flex: 1; }
+  .cc-item .cc-dial { color: var(--muted); font-size: 13px; }
+  .cc-item.hidden { display: none; }
   button {
     padding: 12px 24px; font-size: 15px; font-weight: 600; background: var(--accent);
     color: #fff; border: none; border-radius: 8px; cursor: pointer;
@@ -112,9 +136,20 @@
   <div id="type-picker" class="type-picker"></div>
 
   <div class="search-box">
-    <select id="country-code" style="display:none" title="Country code"></select>
-    <input type="text" id="target" placeholder="Enter target…"
-           onkeydown="if(event.key==='Enter')scan()" />
+    <div class="cc-dropdown" id="country-code" style="display:none">
+      <button type="button" class="cc-toggle" id="cc-toggle" onclick="toggleCC(event)" title="Country code" aria-haspopup="listbox">
+        <img class="cc-flag" id="cc-flag" alt="" onerror="this.style.display='none'">
+        <span id="cc-code">+34</span>
+        <span class="cc-caret">▾</span>
+      </button>
+      <div class="cc-menu" id="cc-menu">
+        <input type="text" class="cc-search" id="cc-search" placeholder="Search country…"
+               oninput="filterCC(this.value)" onclick="event.stopPropagation()">
+        <ul class="cc-list" id="cc-list"></ul>
+      </div>
+    </div>
+    <input type="text" id="target" placeholder="Enter target…" inputmode="text"
+           oninput="onTargetInput(this)" onkeydown="if(event.key==='Enter')scan()" />
     <button id="btn" onclick="scan()">Scan</button>
   </div>
   <div class="hint" id="hint"></div>
@@ -137,74 +172,120 @@ const TARGET_TYPES = [
 ];
 let currentType = "auto";
 
-/* Country codes (flag · name · code). Sorted by frequency + alphabetical. */
+/* Country codes (iso · flag · name · dial). Sorted by frequency + region. */
 const COUNTRY_CODES = [
-  { code: "+34",  flag: "🇪🇸", name: "Spain" },
-  { code: "+1",   flag: "🇺🇸", name: "United States / Canada" },
-    { code: "+52",  flag: "🇲🇽", name: "Mexico" },
-    { code: "+54",  flag: "🇦🇷", name: "Argentina" },
-    { code: "+55",  flag: "🇧🇷", name: "Brazil" },
-  { code: "+56",  flag: "🇨🇱", name: "Chile" },
-  { code: "+57",  flag: "🇨🇴", name: "Colombia" },
-  { code: "+58",  flag: "🇻🇪", name: "Venezuela" },
-  { code: "+51",  flag: "🇵🇪", name: "Peru" },
-  { code: "+593", flag: "🇪🇨", name: "Ecuador" },
-  { code: "+591", flag: "🇧🇴", name: "Bolivia" },
-  { code: "+595", flag: "🇵🇾", name: "Paraguay" },
-  { code: "+598", flag: "🇺🇾", name: "Uruguay" },
-  { code: "+502", flag: "🇬🇹", name: "Guatemala" },
-  { code: "+52",  flag: "🇲🇽", name: "Mexico" },
-  { code: "+54",  flag: "🇦🇷", name: "Argentina" },
-  { code: "+55",  flag: "🇧🇷", name: "Brazil" },
-  { code: "+56",  flag: "🇨🇱", name: "Chile" },
-  { code: "+57",  flag: "🇨🇴", name: "Colombia" },
-  { code: "+58",  flag: "🇻🇪", name: "Venezuela" },
-  { code: "+51",  flag: "🇵🇪", name: "Peru" },
-  { code: "+593", flag: "🇪🇨", name: "Ecuador" },
-  { code: "+591", flag: "🇧🇴", name: "Bolivia" },
-  { code: "+595", flag: "🇵🇾", name: "Paraguay" },
-  { code: "+598", flag: "🇺🇾", name: "Uruguay" },
-  { code: "+502", flag: "🇬🇹", name: "Guatemala" },
-  { code: "+503", flag: "🇸🇻", name: "El Salvador" },
-  { code: "+504", flag: "🇭🇳", name: "Honduras" },
-  { code: "+505", flag: "🇳🇮", name: "Nicaragua" },
-  { code: "+506", flag: "🇨🇷", name: "Costa Rica" },
-  { code: "+507", flag: "🇵🇦", name: "Panama" },
-  { code: "+53",  flag: "🇨🇺", name: "Cuba" },
-  { code: "+1809",flag: "🇩🇴", name: "Dominican Republic" },
-  { code: "+44",  flag: "🇬🇧", name: "United Kingdom" },
-  { code: "+33",  flag: "🇫🇷", name: "France" },
-  { code: "+49",  flag: "🇩🇪", name: "Germany" },
-  { code: "+39",  flag: "🇮🇹", name: "Italy" },
-  { code: "+351", flag: "🇵🇹", name: "Portugal" },
-  { code: "+31",  flag: "🇳🇱", name: "Netherlands" },
-  { code: "+32",  flag: "🇧🇪", name: "Belgium" },
-  { code: "+41",  flag: "🇨🇭", name: "Switzerland" },
-  { code: "+43",  flag: "🇦🇹", name: "Austria" },
-  { code: "+353", flag: "🇮🇪", name: "Ireland" },
-  { code: "+30",  flag: "🇬🇷", name: "Greece" },
-  { code: "+48",  flag: "🇵🇱", name: "Poland" },
-  { code: "+7",   flag: "🇷🇺", name: "Russia" },
-  { code: "+380", flag: "🇺🇦", name: "Ukraine" },
-  { code: "+90",  flag: "🇹🇷", name: "Turkey" },
-  { code: "+212", flag: "🇲🇦", name: "Morocco" },
-  { code: "+20",  flag: "🇪🇬", name: "Egypt" },
-  { code: "+27",  flag: "🇿🇦", name: "South Africa" },
-  { code: "+91",  flag: "🇮🇳", name: "India" },
-  { code: "+86",  flag: "🇨🇳", name: "China" },
-  { code: "+81",  flag: "🇯🇵", name: "Japan" },
-  { code: "+82",  flag: "🇰🇷", name: "South Korea" },
-  { code: "+61",  flag: "🇦🇺", name: "Australia" },
-  { code: "+64",  flag: "🇳🇿", name: "New Zealand" },
-  { code: "+972", flag: "🇮🇱", name: "Israel" },
-  { code: "+971", flag: "🇦🇪", name: "United Arab Emirates" },
-]
+  { code: "+34",  iso: "es", flag: "🇪🇸", name: "Spain" },
+  { code: "+1",   iso: "us", flag: "🇺🇸", name: "United States / Canada" },
+  { code: "+52",  iso: "mx", flag: "🇲🇽", name: "Mexico" },
+  { code: "+54",  iso: "ar", flag: "🇦🇷", name: "Argentina" },
+  { code: "+55",  iso: "br", flag: "🇧🇷", name: "Brazil" },
+  { code: "+56",  iso: "cl", flag: "🇨🇱", name: "Chile" },
+  { code: "+57",  iso: "co", flag: "🇨🇴", name: "Colombia" },
+  { code: "+58",  iso: "ve", flag: "🇻🇪", name: "Venezuela" },
+  { code: "+51",  iso: "pe", flag: "🇵🇪", name: "Peru" },
+  { code: "+593", iso: "ec", flag: "🇪🇨", name: "Ecuador" },
+  { code: "+591", iso: "bo", flag: "🇧🇴", name: "Bolivia" },
+  { code: "+595", iso: "py", flag: "🇵🇾", name: "Paraguay" },
+  { code: "+598", iso: "uy", flag: "🇺🇾", name: "Uruguay" },
+  { code: "+502", iso: "gt", flag: "🇬🇹", name: "Guatemala" },
+  { code: "+503", iso: "sv", flag: "🇸🇻", name: "El Salvador" },
+  { code: "+504", iso: "hn", flag: "🇭🇳", name: "Honduras" },
+  { code: "+505", iso: "ni", flag: "🇳🇮", name: "Nicaragua" },
+  { code: "+506", iso: "cr", flag: "🇨🇷", name: "Costa Rica" },
+  { code: "+507", iso: "pa", flag: "🇵🇦", name: "Panama" },
+  { code: "+53",  iso: "cu", flag: "🇨🇺", name: "Cuba" },
+  { code: "+1809",iso: "do", flag: "🇩🇴", name: "Dominican Republic" },
+  { code: "+44",  iso: "gb", flag: "🇬🇧", name: "United Kingdom" },
+  { code: "+33",  iso: "fr", flag: "🇫🇷", name: "France" },
+  { code: "+49",  iso: "de", flag: "🇩🇪", name: "Germany" },
+  { code: "+39",  iso: "it", flag: "🇮🇹", name: "Italy" },
+  { code: "+351", iso: "pt", flag: "🇵🇹", name: "Portugal" },
+  { code: "+31",  iso: "nl", flag: "🇳🇱", name: "Netherlands" },
+  { code: "+32",  iso: "be", flag: "🇧🇪", name: "Belgium" },
+  { code: "+41",  iso: "ch", flag: "🇨🇭", name: "Switzerland" },
+  { code: "+43",  iso: "at", flag: "🇦🇹", name: "Austria" },
+  { code: "+353", iso: "ie", flag: "🇮🇪", name: "Ireland" },
+  { code: "+30",  iso: "gr", flag: "🇬🇷", name: "Greece" },
+  { code: "+48",  iso: "pl", flag: "🇵🇱", name: "Poland" },
+  { code: "+7",   iso: "ru", flag: "🇷🇺", name: "Russia" },
+  { code: "+380", iso: "ua", flag: "🇺🇦", name: "Ukraine" },
+  { code: "+90",  iso: "tr", flag: "🇹🇷", name: "Turkey" },
+  { code: "+212", iso: "ma", flag: "🇲🇦", name: "Morocco" },
+  { code: "+20",  iso: "eg", flag: "🇪🇬", name: "Egypt" },
+  { code: "+27",  iso: "za", flag: "🇿🇦", name: "South Africa" },
+  { code: "+91",  iso: "in", flag: "🇮🇳", name: "India" },
+  { code: "+86",  iso: "cn", flag: "🇨🇳", name: "China" },
+  { code: "+81",  iso: "jp", flag: "🇯🇵", name: "Japan" },
+  { code: "+82",  iso: "kr", flag: "🇰🇷", name: "South Korea" },
+  { code: "+61",  iso: "au", flag: "🇦🇺", name: "Australia" },
+  { code: "+64",  iso: "nz", flag: "🇳🇿", name: "New Zealand" },
+  { code: "+972", iso: "il", flag: "🇮🇱", name: "Israel" },
+  { code: "+971", iso: "ae", flag: "🇦🇪", name: "United Arab Emirates" },
+];
+
+let selectedDial = COUNTRY_CODES[0].code;
+
+/* Flag image URL (flagcdn); falls back to the emoji if the image can't load. */
+function flagImg(c, cls) {
+  return `<img class="${cls}" src="https://flagcdn.com/w40/${c.iso}.png" alt=""`
+       + ` onerror="this.replaceWith(document.createTextNode('${c.flag} '))">`;
+}
 
 function populateCountryCodes() {
-  const sel = document.getElementById("country-code");
-  sel.innerHTML = COUNTRY_CODES.map(c =>
-    `<option value="${c.code}">${c.flag} ${c.name} (${c.code})</option>`
+  const list = document.getElementById("cc-list");
+  list.innerHTML = COUNTRY_CODES.map((c, i) =>
+    `<li class="cc-item" data-name="${c.name.toLowerCase()}" data-dial="${c.code}" onclick="selectCC(${i})">
+       ${flagImg(c, "cc-flag")}
+       <span class="cc-name">${c.name}</span>
+       <span class="cc-dial">${c.code}</span>
+     </li>`
   ).join("");
+  selectCC(0);
+}
+
+function selectCC(i) {
+  const c = COUNTRY_CODES[i];
+  selectedDial = c.code;
+  document.getElementById("cc-code").textContent = c.code;
+  const flag = document.getElementById("cc-flag");
+  flag.style.display = "";
+  flag.src = `https://flagcdn.com/w40/${c.iso}.png`;
+  flag.alt = c.name;
+  closeCC();
+}
+
+function toggleCC(e) {
+  e.stopPropagation();
+  const d = document.getElementById("country-code");
+  const opening = !d.classList.contains("open");
+  d.classList.toggle("open", opening);
+  if (opening) {
+    const s = document.getElementById("cc-search");
+    s.value = ""; filterCC(""); s.focus();
+  }
+}
+
+function closeCC() { document.getElementById("country-code").classList.remove("open"); }
+
+function filterCC(q) {
+  q = q.trim().toLowerCase();
+  document.querySelectorAll("#cc-list .cc-item").forEach(li => {
+    const match = li.dataset.name.includes(q) || li.dataset.dial.includes(q);
+    li.classList.toggle("hidden", !match);
+  });
+}
+
+/* Close the dropdown when clicking outside of it. */
+document.addEventListener("click", e => {
+  const d = document.getElementById("country-code");
+  if (d && !d.contains(e.target)) closeCC();
+});
+
+/* In phone mode, keep the target input numeric (digits and spaces only). */
+function onTargetInput(el) {
+  if (currentType !== "phone") return;
+  const cleaned = el.value.replace(/[^\d\s]/g, "");
+  if (cleaned !== el.value) el.value = cleaned;
 }
 
 function renderTypePicker() {
@@ -222,7 +303,11 @@ function applyType() {
   const isPhone = currentType === "phone";
   const cc = document.getElementById("country-code");
   cc.style.display = isPhone ? "block" : "none";
-  document.getElementById("target").placeholder = isPhone ? "600 000 000 (local number)" : t.placeholder;
+  if (!isPhone) closeCC();
+  const input = document.getElementById("target");
+  input.placeholder = isPhone ? "600 000 000 (local number)" : t.placeholder;
+  input.setAttribute("inputmode", isPhone ? "numeric" : "text");
+  if (isPhone) onTargetInput(input);   // strip any letters left over from another mode
   document.getElementById("hint").textContent = t.hint;
 }
 
@@ -231,8 +316,7 @@ async function scan() {
   if (!target) return;
   // In phone mode, prepend the selected country code unless the user already entered an international prefix.
   if (currentType === "phone" && !target.startsWith("+") && !target.startsWith("00")) {
-    const cc = document.getElementById("country-code").value;
-    target = cc + " " + target;
+    target = selectedDial + " " + target;
   }
   const btn = document.getElementById("btn");
   const results = document.getElementById("results");
