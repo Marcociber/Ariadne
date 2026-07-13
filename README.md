@@ -37,11 +37,11 @@ Open-source intelligence dashboard that aggregates **multiple free sources** int
 
 The dashboard includes a graph view (force-directed, drawn on canvas without external libraries) that places the target at the center, branches each module, and highlights correlated nodes between sources.
 
-![Domain graph](docs/graph-domain.png)
+![Domain graph](osint-tool/docs/graph-domain.png)
 
 *Example with a domain: yellow nodes with white borders (`ns1.example.com`, `mail.example.com`) appear in two sources at once.*
 
-![Phone graph](docs/graph-phone.png)
+![Phone graph](osint-tool/docs/graph-phone.png)
 
 *Example with a phone: one module with multiple attributes.*
 
