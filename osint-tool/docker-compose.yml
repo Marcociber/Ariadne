@@ -10,6 +10,6 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - ./frontend:/usr/share/nginx/html:ro
+      - ../index.html:/usr/share/nginx/html/index.html:ro
     depends_on:
       - backend

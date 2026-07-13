@@ -85,7 +85,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-**Frontend:** open `frontend/index.html` in your browser (or serve it with any static server). Point it to `http://127.0.0.1:8000`.
+**Frontend:** open `index.html` (at the repo root) in your browser (or serve it with any static server). Point it to `http://127.0.0.1:8000`.
 
 ## 📡 API
 
