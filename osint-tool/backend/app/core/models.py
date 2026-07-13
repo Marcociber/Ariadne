@@ -58,3 +58,4 @@ class ScanResponse(BaseModel):
     results: list[ModuleResult]
     correlations: list[Correlation] = Field(default_factory=list)
     total_elapsed_ms: int = 0
+    cached: bool = False   # True when served from the Redis cache

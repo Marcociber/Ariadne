@@ -2,21 +2,23 @@
 Main API.
 
 Endpoints:
-  GET  /health          -> healthcheck
-  GET  /modules         -> list available modules and supported types
-  POST /scan            -> run a scan on a target
+  GET  /health              -> healthcheck
+  GET  /modules             -> list available modules and supported types
+  POST /scan                -> run a scan on a target
+  GET  /history             -> list recent scans (persistent)
+  GET  /history/{scan_id}   -> retrieve a stored scan
 
 Run locally:
   uvicorn app.main:app --reload
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from . import modules  # noqa: F401  -> registers all plugins
 from .core.orchestrator import Orchestrator
-from .core.base import REGISTRY
 from .core.models import ScanResponse
+from .core import history
 
 app = FastAPI(
     title="OSINT All-in-One (free version)",
@@ -50,14 +52,29 @@ async def health():
 async def list_modules():
     return [
         {
-            "name": cls.name,
-            "supported_types": [t.value for t in cls.supported_types],
-            "requires_key": cls.requires_key,
+            "name": inst.name,
+            "supported_types": [t.value for t in inst.supported_types],
+            "requires_key": inst.requires_key,
+            "available": inst.is_available(),
         }
-        for cls in REGISTRY
+        for inst in orchestrator.modules
     ]
 
 
 @app.post("/scan", response_model=ScanResponse)
 async def scan(req: ScanRequest):
     return await orchestrator.scan(req.target, req.target_type)
+
+
+@app.get("/history")
+async def history_list(limit: int = 50):
+    """Recent scans (newest first), without the full result payload."""
+    return history.list_recent(limit)
+
+
+@app.get("/history/{scan_id}", response_model=ScanResponse)
+async def history_get(scan_id: int):
+    data = history.get(scan_id)
+    if not data:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    return data

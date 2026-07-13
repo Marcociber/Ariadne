@@ -6,3 +6,4 @@ python-whois==0.9.4
 phonenumbers==8.13.45
 pydantic==2.9.2
 maigret==0.6.2
+redis==5.0.8          # optional: scan-result cache (no-op if REDIS_URL is unset)

@@ -31,7 +31,7 @@ Open-source intelligence dashboard that aggregates **multiple free sources** int
 | Username   | `username`| Presence on 150+ platforms via **Maigret** (real detection) + **profile count**                        |
 | Phone      | `phone`   | Validity, formats (E.164/intl/national), country + **flag**, region, **carrier** (mobile only), timezone, line type, length, and **pivot links** (WhatsApp/Telegram/Truecaller/search) filtered by line type |
 
-> Paid modules (HIBP, Shodan, Hunter.io…) can be added as optional plugins using `.env`. The architecture already supports them through the `requires_key` flag.
+> **Key-based modules** (`shodan`, `hibp`) are already included as optional plugins — they activate automatically when you set their API key in `.env`. See [Optional key-based modules](#-optional-key-based-modules).
 
 ## 🖼️ Graph view
 
@@ -89,11 +89,13 @@ uvicorn app.main:app --reload
 
 ## 📡 API
 
-| Method | Path       | Description                          |
-|--------|------------|--------------------------------------|
-| GET    | `/health`  | Healthcheck                          |
-| GET    | `/modules` | List available modules and supported types |
-| POST   | `/scan`    | Scan a target                        |
+| Method | Path                | Description                                            |
+|--------|---------------------|--------------------------------------------------------|
+| GET    | `/health`           | Healthcheck                                            |
+| GET    | `/modules`          | List modules, supported types and whether each is available |
+| POST   | `/scan`             | Scan a target                                          |
+| GET    | `/history`          | List recent scans (newest first). Query: `?limit=50`   |
+| GET    | `/history/{id}`     | Retrieve a stored scan by id                           |
 
 The `/scan` body accepts:
 
@@ -138,6 +140,36 @@ class MySource(OSINTModule):
 
 That is all — the orchestrator detects it and uses it automatically.
 
+## 🔑 Optional key-based modules
+
+Some modules use paid / key-gated APIs. They stay **disabled** until you provide
+their key, and activate automatically once it is set (no code changes needed):
+
+| Module   | Target | Env var          | What it adds                                         |
+|----------|--------|------------------|------------------------------------------------------|
+| `shodan` | Domain | `SHODAN_API_KEY` | Resolved IP, organization, open ports, services, CVEs |
+| `hibp`   | Email  | `HIBP_API_KEY`   | Whether the email appears in known data breaches      |
+
+Copy `backend/.env.example` to `backend/.env` and fill in the keys you have.
+`GET /modules` reports each module's `available` flag so you can see what's active.
+
+## ⚡ Caching & 🕘 history
+
+- **Redis cache (optional).** Set `REDIS_URL` (e.g. `redis://localhost:6379/0`) to
+  cache scan results for `CACHE_TTL` seconds (default 3600). Repeated scans of the
+  same target return instantly and are flagged `cached` in the response. If Redis is
+  unset or unreachable, caching is silently skipped — scans still work.
+- **Persistent history.** Every scan is stored (SQLite by default, at `HISTORY_DB`,
+  default `ariadne_history.db`). Browse it from the **🕘 History** button in the UI,
+  or via `GET /history` and `GET /history/{id}`.
+
+The Docker setup wires Redis and a persistent history volume automatically.
+
+## 📤 Export
+
+From the results bar you can export any scan as **JSON** (⬇ JSON) or as a printable
+**PDF** (🖨 PDF, via the browser's print dialog).
+
 ## 🗺️ Roadmap
 
 - [x] ~~Visual graph of entity relationships.~~ ✅
@@ -145,10 +177,12 @@ That is all — the orchestrator detects it and uses it automatically.
 - [x] ~~Target type selector + country code dropdown.~~ ✅
 - [x] ~~Searchable phone picker with image-based country flags + digits-only input.~~ ✅
 - [x] ~~Enhanced modules (DMARC/SPF/PTR, DNSSEC, CAs, phone pivots…).~~ ✅
-- [ ] Redis cache to avoid repeated queries.
-- [ ] Scan history in PostgreSQL.
-- [ ] Optional paid plugins (Shodan, HIBP) toggleable via `.env`.
-- [ ] Export reports (JSON / PDF).
+- [x] ~~Redis cache to avoid repeated queries.~~ ✅
+- [x] ~~Persistent scan history (SQLite by default; `HISTORY_DB` swappable).~~ ✅
+- [x] ~~Optional paid plugins (Shodan, HIBP) toggleable via `.env`.~~ ✅
+- [x] ~~Export reports (JSON / PDF).~~ ✅
+- [ ] Auth + multi-user workspaces.
+- [ ] Scheduled re-scans with change alerts.
 
 ## ⚙️ Username module configuration (Maigret)
 

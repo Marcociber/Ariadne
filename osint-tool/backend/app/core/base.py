@@ -35,6 +35,15 @@ class OSINTModule(ABC):
     def supports(self, target_type: TargetType) -> bool:
         return target_type in self.supported_types
 
+    def is_available(self) -> bool:
+        """Whether this module can run right now.
+
+        Free modules are always available. Key-based modules override this to
+        return True only when their API key is configured, so the orchestrator
+        can include them dynamically instead of always skipping them.
+        """
+        return not self.requires_key
+
     async def run(self, target: str, target_type: TargetType) -> ModuleResult:
         """Envuelve _run con medición de tiempo y captura de errores.
 

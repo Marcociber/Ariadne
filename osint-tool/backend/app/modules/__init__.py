@@ -10,3 +10,6 @@ from . import crtsh_module      # noqa: F401
 from . import email_module      # noqa: F401
 from . import username_module   # noqa: F401
 from . import phone_module      # noqa: F401
+# Optional, key-based modules (skipped automatically when their key is unset).
+from . import shodan_module     # noqa: F401
+from . import hibp_module       # noqa: F401

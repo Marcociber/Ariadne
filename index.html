@@ -123,15 +123,69 @@
   .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
   .graph-tip { position: absolute; bottom: 12px; right: 12px; font-size: 11px; color: var(--muted); background: rgba(13,17,23,.85); padding: 4px 8px; border-radius: 6px; }
   .node-tooltip { position: absolute; pointer-events: none; background: #000; border: 1px solid var(--accent); border-radius: 6px; padding: 6px 10px; font-size: 12px; max-width: 280px; word-break: break-all; display: none; z-index: 10; }
+  /* Header toolbar */
+  .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .toolbar { display: flex; gap: 8px; flex: none; }
+  .tool-btn {
+    padding: 8px 14px; font-size: 13px; font-weight: 600; background: var(--panel);
+    color: var(--text); border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+  }
+  .tool-btn:hover { border-color: var(--accent); color: var(--accent); }
+  /* Small action buttons in the results meta bar */
+  .meta .act {
+    padding: 5px 12px; font-size: 12px; font-weight: 600; background: var(--panel);
+    color: var(--text); border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+  }
+  .meta .act:hover { border-color: var(--accent); color: var(--accent); }
+  .badge.cached { background: rgba(63,185,80,.15); color: var(--green); }
+  /* History panel */
+  #history-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 18px; overflow: hidden; display: none; }
+  #history-panel.open { display: block; }
+  .hist-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .hist-head h3 { margin: 0; font-size: 14px; }
+  .hist-item {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    border-bottom: 1px solid rgba(48,54,61,.5); cursor: pointer; font-size: 13px;
+  }
+  .hist-item:last-child { border-bottom: none; }
+  .hist-item:hover { background: rgba(47,129,247,.1); }
+  .hist-item .h-target { font-weight: 600; flex: 1; word-break: break-all; }
+  .hist-item .h-meta { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .hist-empty { padding: 20px 16px; color: var(--muted); text-align: center; font-size: 13px; }
+  /* Print / PDF export */
+  @media print {
+    body { background: #fff !important; color: #000 !important; }
+    #bg-canvas, .toolbar, .type-picker, .search-box, .hint, .view-toggle,
+    .meta .act, #history-panel, .graph-tip { display: none !important; }
+    .container { max-width: 100%; }
+    .module-card, .correlations { break-inside: avoid; border-color: #ccc; }
+    a { color: #000; text-decoration: underline; }
+    .badge { border: 1px solid #999; color: #000; background: none; }
+  }
 </style>
 </head>
 <body>
 <canvas id="bg-canvas"></canvas>
 <div class="container">
   <header>
-    <h1>ARIADNE</h1>
-    <p>Open-source intelligence dashboard — free, no API keys required</p>
+    <div class="header-row">
+      <div>
+        <h1>ARIADNE</h1>
+        <p>Open-source intelligence dashboard — free, no API keys required</p>
+      </div>
+      <div class="toolbar">
+        <button class="tool-btn" onclick="toggleHistory()" title="Recent scans">🕘 History</button>
+      </div>
+    </div>
   </header>
+
+  <div id="history-panel">
+    <div class="hist-head">
+      <h3>🕘 Scan history</h3>
+      <button class="act" onclick="toggleHistory()">Close</button>
+    </div>
+    <div id="history-list"></div>
+  </div>
 
   <div id="type-picker" class="type-picker"></div>
 
@@ -343,6 +397,9 @@ function renderAll() {
     <span>Target: <span class="badge">${escapeHtml(data.target)}</span></span>
     <span>Type: <span class="badge">${data.target_type}</span></span>
     <span>Time: ${data.total_elapsed_ms} ms</span>
+    ${data.cached ? '<span class="badge cached">⚡ cached</span>' : ''}
+    <button class="act" onclick="exportJSON()" title="Download as JSON">⬇ JSON</button>
+    <button class="act" onclick="exportPDF()" title="Save as PDF (print)">🖨 PDF</button>
     <span class="view-toggle">
       <button id="tab-list" class="${currentView==='list'?'active':''}" onclick="setView('list')">List</button>
       <button id="tab-graph" class="${currentView==='graph'?'active':''}" onclick="setView('graph')">Graph</button>
@@ -353,6 +410,64 @@ function renderAll() {
 }
 
 function setView(v) { currentView = v; renderAll(); }
+
+/* ---------- EXPORT ---------- */
+function exportJSON() {
+  if (!lastData) return;
+  const blob = new Blob([JSON.stringify(lastData, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const safe = (lastData.target || "scan").replace(/[^a-z0-9._-]+/gi, "_");
+  a.href = url;
+  a.download = `ariadne_${safe}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportPDF() {
+  if (!lastData) return;
+  if (currentView !== "list") setView("list");  // print the readable list view
+  setTimeout(() => window.print(), 50);          // let the DOM settle first
+}
+
+/* ---------- HISTORY ---------- */
+async function toggleHistory() {
+  const panel = document.getElementById("history-panel");
+  const opening = !panel.classList.contains("open");
+  panel.classList.toggle("open", opening);
+  if (opening) await loadHistory();
+}
+
+async function loadHistory() {
+  const list = document.getElementById("history-list");
+  list.innerHTML = `<div class="hist-empty">Loading…</div>`;
+  try {
+    const resp = await fetch(`${API}/history?limit=50`);
+    const items = await resp.json();
+    if (!items.length) { list.innerHTML = `<div class="hist-empty">No scans yet.</div>`; return; }
+    list.innerHTML = items.map(it => {
+      const when = (it.created_at || "").replace("T", " ").replace(/(\+00:00|Z)$/, " UTC");
+      return `<div class="hist-item" onclick="openHistoryScan(${it.id})">
+        <span class="h-target">${escapeHtml(it.target)}</span>
+        <span class="badge">${it.target_type}</span>
+        <span class="h-meta">${it.findings_count} findings · ${when}</span>
+      </div>`;
+    }).join("");
+  } catch (e) {
+    list.innerHTML = `<div class="hist-empty">Could not load history (is the backend running?).</div>`;
+  }
+}
+
+async function openHistoryScan(id) {
+  try {
+    const resp = await fetch(`${API}/history/${id}`);
+    if (!resp.ok) return;
+    lastData = await resp.json();
+    document.getElementById("history-panel").classList.remove("open");
+    renderAll();
+    document.getElementById("results").scrollIntoView({ behavior: "smooth" });
+  } catch (e) { /* ignore */ }
+}
 
 /* ---------- LIST VIEW ---------- */
 function renderList() {
