@@ -55,8 +55,8 @@ class PhoneModule(OSINTModule):
         )
         if not valid:
             findings.append(Finding(
-                label="Estructura posible",
-                value="Sí (longitud plausible pero no asignado)" if possible else "No",
+                label="Possible structure",
+                value="Yes (plausible length but not assigned)" if possible else "No",
                 category="phone",
             ))
             return findings
@@ -65,27 +65,27 @@ class PhoneModule(OSINTModule):
         region_code = phonenumbers.region_code_for_number(parsed) or ""
 
         # --- Identidad del número ---
-        findings.append(Finding(label="Formato E.164", value=e164, category="phone"))
+        findings.append(Finding(label="E.164 format", value=e164, category="phone"))
         findings.append(Finding(
-            label="Formato internacional",
+            label="International format",
             value=phonenumbers.format_number(
                 parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL),
             category="phone",
         ))
         findings.append(Finding(
-            label="Formato nacional",
+            label="National format",
             value=phonenumbers.format_number(
                 parsed, phonenumbers.PhoneNumberFormat.NATIONAL),
             category="phone",
         ))
 
-        # --- País / geografía ---
+        # --- Country / geography ---
         cc = parsed.country_code
         flag = _flag(region_code)
         country_val = f"+{cc}" + (f" · {region_code} {flag}".rstrip() if region_code else "")
-        findings.append(Finding(label="Código de país", value=country_val, category="phone"))
+        findings.append(Finding(label="Country code", value=country_val, category="phone"))
 
-        region = geocoder.description_for_number(parsed, "es")
+        region = geocoder.description_for_number(parsed, "en")
         if region:
             findings.append(Finding(label="Region / location", value=region, category="phone"))
 
@@ -99,7 +99,7 @@ class PhoneModule(OSINTModule):
         # the ORIGINAL numbering block (not ported numbers). For fixed
         # lines it's often empty or incorrect, so we show it only for
         # mobiles and with low confidence.
-        car = carrier.name_for_number(parsed, "es") if mobile_capable else ""
+        car = carrier.name_for_number(parsed, "en") if mobile_capable else ""
         if car:
             findings.append(Finding(
                 label="Carrier (original block, no portability)",
@@ -107,17 +107,17 @@ class PhoneModule(OSINTModule):
 
         tzs = list(timezone.time_zones_for_number(parsed))
         for tz in tzs:
-            findings.append(Finding(label="Zona horaria", value=tz, category="phone"))
+            findings.append(Finding(label="Timezone", value=tz, category="phone"))
 
-        # --- Características técnicas ---
-        line_type = self.LINE_TYPES.get(ntype, "Desconocido")
-        findings.append(Finding(label="Tipo de línea", value=line_type, category="phone"))
+        # --- Technical characteristics ---
+        line_type = self.LINE_TYPES.get(ntype, "Unknown")
+        findings.append(Finding(label="Line type", value=line_type, category="phone"))
 
         national = phonenumbers.national_significant_number(parsed)
         findings.append(Finding(
-            label="Número nacional", value=national, category="phone"))
+            label="National number", value=national, category="phone"))
         findings.append(Finding(
-            label="Longitud (nacional)", value=str(len(national)), category="phone"))
+            label="Length (national)", value=str(len(national)), category="phone"))
 
         # --- OSINT pivot links (only constructed, not queried) ---
         from urllib.parse import quote

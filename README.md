@@ -1,6 +1,6 @@
 # 🔍 OSINT All-in-One
 
-Open-source intelligence dashboard that aggregates **multiple free sources** into a single API and unified panel. Enter a target — domain, email, username, or phone — and the tool auto-detects the type, runs all compatible sources in **parallel**, normalizes the results, and correlates data across modules.
+Open-source intelligence dashboard that aggregates **multiple free sources** into a single API and unified panel. Enter a target — domain, email, username, phone or IP — and the tool auto-detects the type, runs all compatible sources in **parallel**, normalizes the results, and correlates data across modules.
 
 > ⚠️ **Ethical use.** This tool only queries **public** information. Use it only on targets you own or are authorized to scan. Respect each source's Terms of Service and applicable law. The author is not responsible for misuse.
 
@@ -8,8 +8,10 @@ Open-source intelligence dashboard that aggregates **multiple free sources** int
 
 ## ✨ Features
 
-- **Target selection**: choose the type (domain, email, username, phone) with a selector, or leave it on **Auto** for automatic detection.
+- **Target selection**: choose the type (domain, email, username, phone, **IP**) with a selector, or leave it on **Auto** for automatic detection.
 - **Country code selector**: when scanning a phone, a dropdown with +45 countries (flag + code) lets you enter only the local number.
+- **Search & filter results**: a live search box filters every finding across all modules (by label or value, with match highlighting), plus one-click **category filters** and a **summary** (findings, sources with data, categories, scan time).
+- **Readable UI**: light/dark **theme toggle** (persisted), collapsible module cards, per-finding **copy-to-clipboard**, and a fully responsive layout (mobile-friendly).
 - **Concurrent execution**: all sources run in parallel using `asyncio`.
 - **Plugin architecture**: adding a new source is creating one class; you do not touch the core.
 - **Normalized output**: every source returns the same structure (`Finding`), ready for the frontend.
@@ -27,9 +29,13 @@ Open-source intelligence dashboard that aggregates **multiple free sources** int
 | Domain     | `dns`     | A, AAAA, MX, NS, TXT, **SOA, CAA** records; **DMARC** policy; labeled **SPF**; **Reverse DNS (PTR)**; **MTA-STS / TLS-RPT / BIMI**; **DNSSEC**; **www** host; recognized **service-verification tokens** (Google/Microsoft/Facebook/Stripe…) |
 | Domain     | `whois`   | Registrar (+ **URL**), WHOIS server, dates (creation/update/expiration), **days until expiration**, **domain age**, **EPP status**, **DNSSEC**, nameservers, registrant, location, emails |
 | Domain     | `crtsh`   | Subdomains via Certificate Transparency + **count**, **cert entries**, **wildcard detection** and **issuing CAs**            |
+| Domain     | `http`    | Live HTTP surface: reachability, status, **redirect chain**, server banner, **page title**, **technology fingerprint** (headers/cookies/generator), and **security-header posture** (HSTS/CSP/X-Frame-Options… present vs. missing) |
+| Domain     | `wayback` | Internet Archive history: **first/last snapshot** dates, direct snapshot links, and a browse-all-captures pivot |
 | Email      | `email`   | **Address analysis** (valid format, role-based/disposable, Gmail canonical form, plus-tag), Gravatar (avatar, name, **location, bio, links**, MD5+**SHA-256**), **mail provider (MX)**, whether the domain **hosts a website**, **SPF/DMARC/MTA-STS**, and **pivots** (candidate username, web/GitHub search) |
 | Username   | `username`| Presence on 150+ platforms via **Maigret** (real detection) + **profile count**                        |
+| Username   | `github`  | Public **GitHub profile** (name, bio, company, location, blog, Twitter), activity (repos, gists, followers, created/last-active dates) and **recent repositories** — GitHub's own API, no key |
 | Phone      | `phone`   | Validity, formats (E.164/intl/national), country + **flag**, region, **carrier** (mobile only), timezone, line type, length, and **pivot links** (WhatsApp/Telegram/Truecaller/**Sync.me**/**Facebook**/search) filtered by line type |
+| IP         | `ip`      | Address scope (public/private/reserved), **geolocation** + ISP/**ASN** (ip-api.com, no key), **reverse DNS (PTR)**, mobile/proxy/hosting flags, and reputation **pivots** (Shodan/Censys/VirusTotal/AbuseIPDB/GreyNoise) |
 
 > **Key-based modules** (`shodan`, `hibp`) are already included as optional plugins — they activate automatically when you set their API key in `.env`. See [Optional key-based modules](#-optional-key-based-modules).
 
@@ -181,6 +187,9 @@ From the results bar you can export any scan as **JSON** (⬇ JSON) or as a prin
 - [x] ~~Persistent scan history (SQLite by default; `HISTORY_DB` swappable).~~ ✅
 - [x] ~~Optional paid plugins (Shodan, HIBP) toggleable via `.env`.~~ ✅
 - [x] ~~Export reports (JSON / PDF).~~ ✅
+- [x] ~~IP target type (geolocation, ASN, reverse DNS, reputation pivots).~~ ✅
+- [x] ~~Key-free enrichment modules: HTTP/security headers, Wayback Machine, GitHub profile.~~ ✅
+- [x] ~~Results search + category filters, summary, copy-to-clipboard, light/dark theme.~~ ✅
 - [ ] Auth + multi-user workspaces.
 - [ ] Scheduled re-scans with change alerts.
 

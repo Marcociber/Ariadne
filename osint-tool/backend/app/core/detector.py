@@ -1,6 +1,7 @@
 """
 Automatically detect which target type the user entered.
 """
+import ipaddress
 import re
 
 from .models import TargetType
@@ -14,11 +15,24 @@ DOMAIN_RE = re.compile(
 PHONE_RE = re.compile(r"^\+?[\d\s\-()]{7,}$")
 
 
+def _is_ip(target: str) -> bool:
+    """True for a valid IPv4 or IPv6 address (public or private)."""
+    try:
+        ipaddress.ip_address(target)
+        return True
+    except ValueError:
+        return False
+
+
 def detect_type(target: str) -> TargetType:
     t = target.strip()
 
     if EMAIL_RE.match(t):
         return TargetType.EMAIL
+
+    # IP address (checked before phone/domain: 8.8.8.8 must not read as a phone).
+    if _is_ip(t):
+        return TargetType.IP
 
     # A phone number: mostly digits and phone characters
     digits = sum(c.isdigit() for c in t)

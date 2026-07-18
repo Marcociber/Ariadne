@@ -15,6 +15,7 @@ class TargetType(str, Enum):
     USERNAME = "username"
     DOMAIN = "domain"
     PHONE = "phone"
+    IP = "ip"
     UNKNOWN = "unknown"
 
 

@@ -6,9 +6,16 @@
 <title>ARIADNE</title>
 <style>
   :root {
-    --bg: #0d1117; --panel: #161b22; --border: #30363d;
+    --bg: #0d1117; --panel: #161b22; --panel-2: #1c232c; --border: #30363d;
     --text: #e6edf3; --muted: #8b949e; --accent: #2f81f7;
     --green: #3fb950; --red: #f85149; --yellow: #d29922; --purple: #bc8cff;
+    --hi: rgba(210,153,34,.35);
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f8fa; --panel: #ffffff; --panel-2: #f0f3f6; --border: #d0d7de;
+    --text: #1f2328; --muted: #59636e; --accent: #0969da;
+    --green: #1a7f37; --red: #cf222e; --yellow: #9a6700; --purple: #8250df;
+    --hi: rgba(154,103,0,.30);
   }
   * { box-sizing: border-box; }
   body {
@@ -152,11 +159,83 @@
   .hist-item .h-target { font-weight: 600; flex: 1; word-break: break-all; }
   .hist-item .h-meta { color: var(--muted); font-size: 12px; white-space: nowrap; }
   .hist-empty { padding: 20px 16px; color: var(--muted); text-align: center; font-size: 13px; }
+  /* ---------- Results search / filter toolbar ---------- */
+  .res-controls {
+    position: sticky; top: 0; z-index: 5; background: var(--bg);
+    padding: 12px 0 10px; margin-bottom: 4px; border-bottom: 1px solid var(--border);
+  }
+  .res-search-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .res-search {
+    flex: 1; padding: 10px 14px 10px 36px; font-size: 14px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 8px; color: var(--text); outline: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2'><circle cx='11' cy='11' r='7'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>");
+    background-repeat: no-repeat; background-position: 12px center;
+  }
+  .res-search:focus { border-color: var(--accent); }
+  .res-clear {
+    padding: 9px 12px; font-size: 13px; font-weight: 600; background: var(--panel);
+    color: var(--muted); border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+  }
+  .res-clear:hover { border-color: var(--accent); color: var(--accent); }
+  .cat-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .cat-chip {
+    padding: 5px 11px; font-size: 12px; font-weight: 600; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 14px; color: var(--muted);
+    cursor: pointer; transition: border-color .12s, color .12s, background .12s;
+  }
+  .cat-chip:hover { border-color: var(--accent); color: var(--text); }
+  .cat-chip.active { background: rgba(47,129,247,.15); border-color: var(--accent); color: var(--accent); }
+  .cat-chip .n { opacity: .65; margin-left: 4px; font-weight: 500; }
+  .res-count { font-size: 12px; color: var(--muted); margin-left: auto; white-space: nowrap; }
+  mark { background: var(--hi); color: inherit; border-radius: 3px; padding: 0 1px; }
+  /* Collapsible module head + finding copy affordance */
+  .module-head { cursor: pointer; user-select: none; }
+  .module-head .chevron { transition: transform .15s; color: var(--muted); font-size: 11px; margin-left: 8px; }
+  .module-card.collapsed .findings { display: none; }
+  .module-card.collapsed .chevron { transform: rotate(-90deg); }
+  .module-head-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .finding { position: relative; align-items: baseline; }
+  .finding .value { flex: 1; }
+  .copy-btn {
+    flex: none; opacity: 0; border: none; background: transparent; cursor: pointer;
+    color: var(--muted); font-size: 12px; padding: 2px 6px; border-radius: 5px; transition: opacity .12s;
+  }
+  .finding:hover .copy-btn { opacity: 1; }
+  .copy-btn:hover { background: rgba(139,148,158,.18); color: var(--text); }
+  .copy-btn.done { color: var(--green); opacity: 1; }
+  /* Summary stat tiles */
+  .summary { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 4px; }
+  .stat {
+    flex: 1; min-width: 120px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .stat .num { font-size: 22px; font-weight: 700; line-height: 1.1; }
+  .stat .lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .no-match { text-align: center; color: var(--muted); padding: 30px; font-size: 14px; }
+  /* Responsive */
+  @media (max-width: 640px) {
+    .container { padding: 20px 14px; }
+    header h1 { font-size: 22px; }
+    .header-row { flex-direction: column; }
+    .toolbar { width: 100%; }
+    .search-box { flex-wrap: wrap; }
+    .search-box input[type=text] { min-width: 0; }
+    .cc-menu { width: min(300px, 86vw); }
+    .finding { flex-direction: column; gap: 2px; }
+    .finding .label { min-width: 0; font-size: 13px; }
+    .copy-btn { opacity: 1; position: absolute; top: 4px; right: 0; }
+    .meta { gap: 10px; }
+    .view-toggle { margin-left: 0; }
+    .res-count { margin-left: 0; width: 100%; }
+    #graph { height: 420px; }
+    .stat { min-width: calc(50% - 5px); }
+  }
   /* Print / PDF export */
   @media print {
     body { background: #fff !important; color: #000 !important; }
     #bg-canvas, .toolbar, .type-picker, .search-box, .hint, .view-toggle,
-    .meta .act, #history-panel, .graph-tip { display: none !important; }
+    .meta .act, #history-panel, .graph-tip, .res-controls, .copy-btn { display: none !important; }
+    .module-card.collapsed .findings { display: block !important; }
     .container { max-width: 100%; }
     .module-card, .correlations { break-inside: avoid; border-color: #ccc; }
     a { color: #000; text-decoration: underline; }
@@ -174,6 +253,7 @@
         <p>Open-source intelligence dashboard — free, no API keys required</p>
       </div>
       <div class="toolbar">
+        <button class="tool-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light / dark">🌙 Theme</button>
         <button class="tool-btn" onclick="toggleHistory()" title="Recent scans">🕘 History</button>
       </div>
     </div>
@@ -215,14 +295,34 @@
 const API = "http://127.0.0.1:8000";
 let lastData = null;
 let currentView = "list";
+let resFilter = { q: "", cat: "all" };   // results search + category filter
+const collapsedMods = new Set();          // modules the user has collapsed
+
+/* ---------- THEME (light / dark, persisted) ---------- */
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  const btn = document.getElementById("theme-btn");
+  if (btn) btn.textContent = t === "light" ? "☀️ Theme" : "🌙 Theme";
+}
+function toggleTheme() {
+  const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  try { localStorage.setItem("ariadne-theme", next); } catch (e) {}
+  applyTheme(next);
+}
+(function initTheme() {
+  let saved = "dark";
+  try { saved = localStorage.getItem("ariadne-theme") || "dark"; } catch (e) {}
+  applyTheme(saved);
+})();
 
 /* ---------- TARGET TYPE SELECTOR ---------- */
 const TARGET_TYPES = [
   { id: "auto",     label: "🎯 Auto",     placeholder: "Enter a target (type auto-detected)…",       hint: "The target type is detected automatically." },
   { id: "domain",   label: "🌐 Domain",  placeholder: "example.com",                                     hint: "Queries DNS, WHOIS and subdomains (Certificate Transparency)." },
   { id: "email",    label: "✉️ Email",    placeholder: "name@example.com",                              hint: "Searches Gravatar profile, associated accounts, and MX servers." },
-  { id: "username", label: "👤 Username", placeholder: "username",                                   hint: "Checks presence on 150+ platforms via Maigret." },
+  { id: "username", label: "👤 Username", placeholder: "username",                                   hint: "Checks 150+ platforms (Maigret) and enriches a public GitHub profile." },
   { id: "phone",    label: "📞 Phone", placeholder: "+34 600 000 000",                                 hint: "Country, carrier, line type, timezone, and OSINT pivots." },
+  { id: "ip",       label: "🖥️ IP",      placeholder: "8.8.8.8",                                         hint: "Geolocation, ISP/ASN, reverse DNS and reputation pivots (free, no key)." },
 ];
 let currentType = "auto";
 
@@ -382,6 +482,7 @@ async function scan() {
       body: JSON.stringify({ target, target_type: currentType }),
     });
     lastData = await resp.json();
+    resFilter = { q: "", cat: "all" }; collapsedMods.clear();
     renderAll();
   } catch (e) {
     results.innerHTML = `<div class="empty-state">Error connecting to the API.<br>Is the backend running at ${API}?</div>`;
@@ -463,17 +564,40 @@ async function openHistoryScan(id) {
     const resp = await fetch(`${API}/history/${id}`);
     if (!resp.ok) return;
     lastData = await resp.json();
+    resFilter = { q: "", cat: "all" }; collapsedMods.clear();
     document.getElementById("history-panel").classList.remove("open");
     renderAll();
     document.getElementById("results").scrollIntoView({ behavior: "smooth" });
   } catch (e) { /* ignore */ }
 }
 
-/* ---------- LIST VIEW ---------- */
+/* ---------- LIST VIEW (summary + search + category filters) ---------- */
+function categoryCounts(data) {
+  const counts = {};
+  for (const r of data.results)
+    for (const f of r.findings) counts[f.category] = (counts[f.category] || 0) + 1;
+  return counts;
+}
+
 function renderList() {
   const data = lastData;
   const body = document.getElementById("view-body");
+  const totalFindings = data.results.reduce((a, r) => a + r.findings.length, 0);
+  const modsWithData = data.results.filter(r => r.findings.length).length;
+  const cats = categoryCounts(data);
+  const catCount = Object.keys(cats).length;
+
   let html = "";
+
+  // Summary stat tiles — a quick, readable overview of the scan.
+  html += `<div class="summary">
+    <div class="stat"><div class="num">${totalFindings}</div><div class="lbl">findings</div></div>
+    <div class="stat"><div class="num">${modsWithData}/${data.results.length}</div><div class="lbl">sources with data</div></div>
+    <div class="stat"><div class="num">${catCount}</div><div class="lbl">categories</div></div>
+    <div class="stat"><div class="num">${data.total_elapsed_ms}<span style="font-size:13px"> ms</span></div><div class="lbl">scan time</div></div>
+  </div>`;
+
+  // Correlations across modules.
   if (data.correlations && data.correlations.length) {
     html += `<div class="correlations"><h3>⚡ Correlations detected</h3>`;
     for (const c of data.correlations) {
@@ -482,28 +606,134 @@ function renderList() {
     }
     html += `</div>`;
   }
-  if (!data.results.length) html += `<div class="empty-state">No modules for this target type.</div>`;
+
+  // Search + category filters (only when there is something to filter).
+  if (totalFindings) {
+    const chips = [
+      `<button class="cat-chip ${resFilter.cat === 'all' ? 'active' : ''}" onclick="setCat('all')">All<span class="n">${totalFindings}</span></button>`
+    ].concat(
+      Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([c, n]) =>
+        `<button class="cat-chip ${resFilter.cat === c ? 'active' : ''}" onclick="setCat('${encodeURIComponent(c)}')">${escapeHtml(c)}<span class="n">${n}</span></button>`)
+    );
+    html += `<div class="res-controls">
+      <div class="res-search-row">
+        <input class="res-search" id="res-search" placeholder="Filter findings by text (label or value)…"
+               value="${escapeHtml(resFilter.q)}" oninput="onResSearch(this.value)">
+        <button class="res-clear" onclick="clearResFilter()">Clear</button>
+      </div>
+      <div class="cat-filters">${chips.join("")}<span class="res-count" id="res-count"></span></div>
+    </div>`;
+  }
+
+  html += `<div id="findings-body"></div>`;
+  body.innerHTML = html;
+  filterFindings();
+}
+
+/* Rebuilds only the findings list (keeps the search box focused while typing). */
+function filterFindings() {
+  const data = lastData;
+  const fb = document.getElementById("findings-body");
+  if (!fb) return;
+  if (!data.results.length) { fb.innerHTML = `<div class="empty-state">No modules for this target type.</div>`; return; }
+
+  const q = resFilter.q.trim().toLowerCase();
+  const cat = resFilter.cat;
+  const filtering = !!q || cat !== "all";
+  let shown = 0, total = 0, html = "";
+
   for (const r of data.results) {
-    html += `<div class="module-card"><div class="module-head">
-      <span class="module-name">${r.module}</span>
-      <span class="status ${r.status}">${statusLabel(r)}</span></div>`;
-    if (r.findings.length) {
+    total += r.findings.length;
+    const matched = r.findings.filter(f => {
+      if (cat !== "all" && f.category !== cat) return false;
+      if (q && !(`${f.label} ${f.value}`.toLowerCase().includes(q))) return false;
+      return true;
+    });
+    if (filtering && matched.length === 0) continue;   // hide modules with no match
+    shown += matched.length;
+
+    const collapsed = collapsedMods.has(r.module) ? "collapsed" : "";
+    const color = MODULE_COLORS[r.module] || "#8b949e";
+    html += `<div class="module-card ${collapsed}"><div class="module-head" onclick="toggleMod('${r.module}')">
+      <span class="module-head-left">
+        <span class="module-name" style="color:${color}">${escapeHtml(r.module)}</span>
+        <span class="status ${r.status}">${statusLabel(r)}</span>
+      </span>
+      <span class="chevron">▾</span></div>`;
+    if (matched.length) {
       html += `<div class="findings">`;
-      for (const f of r.findings) {
-        html += `<div class="finding"><span class="label">${escapeHtml(f.label)}</span>
-          <span class="value">${linkify(f.value)}</span><span class="cat">${f.category}</span></div>`;
+      for (const f of matched) {
+        html += `<div class="finding">
+          <span class="label">${hl(f.label, q)}</span>
+          <span class="value">${valueHtml(f.value, q)}</span>
+          <span class="cat">${escapeHtml(f.category)}</span>
+          <button class="copy-btn" title="Copy value" data-val="${escapeHtml(f.value)}" onclick="copyVal(event, this)">⧉</button>
+        </div>`;
       }
       html += `</div>`;
     }
     html += `</div>`;
   }
-  body.innerHTML = html;
+
+  if (filtering && shown === 0) {
+    html = `<div class="no-match">No findings match your filter.</div>`;
+  }
+  fb.innerHTML = html;
+
+  const rc = document.getElementById("res-count");
+  if (rc) rc.textContent = filtering ? `${shown} of ${total} shown` : `${total} findings`;
+}
+
+function onResSearch(v) { resFilter.q = v; filterFindings(); }
+function clearResFilter() { resFilter = { q: "", cat: "all" }; renderList(); }
+function setCat(c) { resFilter.cat = c === "all" ? "all" : decodeURIComponent(c); renderList(); }
+function toggleMod(m) {
+  if (collapsedMods.has(m)) collapsedMods.delete(m); else collapsedMods.add(m);
+  filterFindings();
+}
+
+function copyVal(e, btn) {
+  e.stopPropagation();
+  const val = btn.dataset.val;
+  const done = () => {
+    btn.textContent = "✓"; btn.classList.add("done");
+    setTimeout(() => { btn.textContent = "⧉"; btn.classList.remove("done"); }, 1000);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(val).then(done).catch(() => {});
+  }
+}
+
+/* Highlight the query inside escaped text (labels + plain values). */
+function hl(text, q) {
+  const s = escapeHtml(String(text));
+  if (!q) return s;
+  const needle = escapeHtml(q).toLowerCase();
+  if (!needle) return s;
+  const low = s.toLowerCase();
+  let out = "", idx = 0, pos;
+  while ((pos = low.indexOf(needle, idx)) !== -1) {
+    out += s.slice(idx, pos) + "<mark>" + s.slice(pos, pos + needle.length) + "</mark>";
+    idx = pos + needle.length;
+  }
+  return out + s.slice(idx);
+}
+
+/* Links stay clickable; non-URL values get search highlighting. */
+function valueHtml(v, q) {
+  if (/^https?:\/\//.test(v)) {
+    const safe = escapeHtml(v);
+    return `<a href="${safe}" target="_blank" rel="noopener">${safe}</a>`;
+  }
+  return hl(v, q);
 }
 
 /* ---------- GRAPH VIEW (force-directed on canvas, no libraries) ---------- */
 const MODULE_COLORS = {
   dns:"#2f81f7", whois:"#3fb950", crtsh:"#bc8cff",
-  email:"#d29922", username:"#f85149", phone:"#39c5cf"
+  email:"#d29922", username:"#f85149", phone:"#39c5cf",
+  github:"#db61a2", http:"#e3b341", wayback:"#a371f7",
+  ip:"#40c463", shodan:"#f0883e", hibp:"#f85149"
 };
 
 function buildGraph(data) {
