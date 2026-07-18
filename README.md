@@ -35,7 +35,7 @@ Open-source intelligence dashboard that aggregates **multiple free sources** int
 | Username   | `username`| Presence on 150+ platforms via **Maigret** (real detection) + **profile count**                        |
 | Username   | `github`  | Public **GitHub profile** (name, bio, company, location, blog, Twitter), activity (repos, gists, followers, created/last-active dates) and **recent repositories** — GitHub's own API, no key |
 | Phone      | `phone`   | Validity, formats (E.164/intl/national), country + **flag**, region, **carrier** (mobile only), timezone, line type, length, and **pivot links** (WhatsApp/Telegram/Truecaller/**Sync.me**/**Facebook**/search) filtered by line type |
-| IP         | `ip`      | Address scope (public/private/reserved), **geolocation** + ISP/**ASN** (ip-api.com, no key), **reverse DNS (PTR)**, mobile/proxy/hosting flags, and reputation **pivots** (Shodan/Censys/VirusTotal/AbuseIPDB/GreyNoise) |
+| IP         | `ip`      | Address scope (public/private/reserved), **multi-source geolocation by consensus** (ip-api.com + ipwho.is + geojs.io + reallyfreegeoip.org — agreement raises confidence, coordinate spread flags approximate fixes), ISP/**ASN**, **reverse DNS (PTR)**, mobile/proxy/hosting flags, and reputation **pivots** (Shodan/Censys/VirusTotal/AbuseIPDB/GreyNoise) |
 
 > **Key-based modules** (`shodan`, `hibp`) are already included as optional plugins — they activate automatically when you set their API key in `.env`. See [Optional key-based modules](#-optional-key-based-modules).
 
