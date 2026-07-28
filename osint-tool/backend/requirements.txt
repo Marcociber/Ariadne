@@ -22,7 +22,7 @@ sse-starlette==2.1.3          # Server-Sent Events for streaming scan progress
 structlog==24.4.0             # structured application logging
 
 # Geolocation
-geoip2==4.8.0                # offline MaxMind GeoLite2 reader; adds an accuracy
+geoip2==5.3.0                # offline MaxMind GeoLite2 reader; adds an accuracy
                              #   radius to IP scans. No-op until a .mmdb is set
 
 # Correlation
