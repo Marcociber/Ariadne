@@ -14,7 +14,7 @@ tenacity==9.0.0               # declarative retries with backoff for HTTP source
 # Sources
 python-whois==0.9.4
 phonenumbers==8.13.45
-maigret==0.6.2                # optional at runtime: the username module degrades if missing
+maigret==0.6.3                # optional at runtime: the username module degrades if missing
 
 # API hardening / observability
 slowapi==0.1.9                # rate limiting
