@@ -1,0 +1,71 @@
+name: Frontend
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, format and accessibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: ESLint
+        run: npx --yes eslint@9 assets/
+
+      - name: Prettier
+        run: npx --yes prettier@3 --check assets/ index.html
+
+      # Pa11y fails the build if an accessibility regression is introduced.
+      - name: Accessibility audit (pa11y-ci)
+        run: |
+          npx --yes http-server . -p 8081 --silent &
+          npx --yes wait-on http://127.0.0.1:8081/index.html
+          npx --yes pa11y-ci@3 --threshold 0 http://127.0.0.1:8081/index.html
+
+  deploy:
+    name: Publish the dashboard to GitHub Pages
+    needs: quality
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stage the static site
+        run: |
+          mkdir -p _site/assets
+          cp index.html _site/
+          cp -r assets/* _site/assets/
+          # A published dashboard needs a public backend. Point it at one by
+          # setting the ARIADNE_API repository variable; otherwise the page
+          # falls back to localhost and the user can set it under ⚙ Settings.
+          if [ -n "${{ vars.ARIADNE_API }}" ]; then
+            printf 'window.ARIADNE_API = "%s";\n' "${{ vars.ARIADNE_API }}" > _site/assets/config.js
+            sed -i 's#<script type="module" src="assets/app.js"></script>#<script src="assets/config.js"></script>\n<script type="module" src="assets/app.js"></script>#' _site/index.html
+          fi
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,62 @@
+name: Docker
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: Build, scan and publish the backend image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the image (loaded locally for scanning)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./osint-tool/backend
+          load: true
+          tags: ariadne-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy (image vulnerabilities)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ariadne-backend:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
+      - name: Verify docker compose is valid
+        run: docker compose -f osint-tool/docker-compose.yml config --quiet
+
+      # Publishing only happens on the default branch and on tags.
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push to GHCR
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./osint-tool/backend
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/backend:latest
+            ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+          cache-from: type=gha

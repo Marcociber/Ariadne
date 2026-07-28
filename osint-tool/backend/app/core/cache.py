@@ -1,61 +1,113 @@
 """
 Optional Redis cache for scan results.
 
-Caching is entirely optional and fails safe: if Redis is not configured
-(no REDIS_URL), the library is missing, or the connection fails, caching is
-silently disabled and scans keep working — just without the cache.
+Caching stays entirely optional and fails safe: with no REDIS_URL, no redis
+library or an unreachable server, it is disabled and scans keep working.
 
-Enable it by setting:
-    REDIS_URL=redis://localhost:6379/0     (host/port of your Redis)
-    CACHE_TTL=3600                          (seconds a result stays cached)
+Two problems from the first version are fixed here:
+
+  * it used the SYNCHRONOUS redis client from inside async code, so every
+    cache hit blocked the event loop. This uses `redis.asyncio`;
+  * the availability check ran once per process, so a Redis that went down and
+    came back stayed "unavailable" until the backend was restarted. The check
+    is now retried every CACHE_RETRY_SECONDS.
+
+Failures are logged instead of silently swallowed.
 """
+
+from __future__ import annotations
+
 import json
-import os
+import time
+from typing import Any
 
-_TTL = int(os.getenv("CACHE_TTL", "3600"))  # seconds
-_client = None
-_checked = False
+from .config import settings
+from .logging import get_logger
+
+log = get_logger("cache")
+
+_client: Any = None
+_last_check: float = 0.0
+_disabled_until: float = 0.0
 
 
-def _get_client():
-    """Lazily build a Redis client once. Returns None if unavailable."""
-    global _client, _checked
-    if _checked:
-        return _client
-    _checked = True
-    url = os.getenv("REDIS_URL")
-    if not url:
+async def _get_client() -> Any:
+    """Return a connected async Redis client, or None when unavailable."""
+    global _client, _last_check, _disabled_until
+
+    if not settings.redis_url:
         return None
+    if _client is not None:
+        return _client
+
+    now = time.monotonic()
+    if now < _disabled_until:
+        return None
+    _last_check = now
+
     try:
-        import redis  # imported lazily so the dependency stays optional
-        client = redis.from_url(url, socket_connect_timeout=1, socket_timeout=1)
-        client.ping()
-        _client = client
-    except Exception:
-        _client = None  # any failure -> caching disabled, never breaks a scan
+        from redis import asyncio as aioredis  # imported lazily: optional dependency
+
+        client = aioredis.from_url(
+            settings.redis_url,
+            socket_connect_timeout=1,
+            socket_timeout=1,
+            decode_responses=True,
+        )
+        await client.ping()
+    except Exception as exc:
+        _disabled_until = now + settings.cache_retry_seconds
+        log.warning("cache.unavailable", error=str(exc), retry_in=settings.cache_retry_seconds)
+        return None
+
+    _client = client
+    log.info("cache.connected", url=settings.redis_url)
     return _client
 
 
-def enabled() -> bool:
-    return _get_client() is not None
+async def enabled() -> bool:
+    return await _get_client() is not None
 
 
-def get(key: str):
-    client = _get_client()
+async def get(key: str) -> dict | None:
+    client = await _get_client()
     if not client:
         return None
     try:
-        raw = client.get(key)
+        raw = await client.get(key)
         return json.loads(raw) if raw else None
-    except Exception:
+    except Exception as exc:
+        log.warning("cache.get_failed", key=key, error=str(exc))
         return None
 
 
-def set(key: str, value: dict) -> None:
-    client = _get_client()
+async def set(key: str, value: dict) -> None:
+    client = await _get_client()
     if not client:
         return
     try:
-        client.setex(key, _TTL, json.dumps(value))
-    except Exception:
-        pass
+        await client.setex(key, settings.cache_ttl, json.dumps(value))
+    except Exception as exc:
+        log.warning("cache.set_failed", key=key, error=str(exc))
+
+
+async def delete(key: str) -> None:
+    """Drop one entry — used by the `refresh` flag to force a re-scan."""
+    client = await _get_client()
+    if not client:
+        return
+    try:
+        await client.delete(key)
+    except Exception as exc:
+        log.warning("cache.delete_failed", key=key, error=str(exc))
+
+
+async def close() -> None:
+    """Release the connection pool (FastAPI lifespan shutdown)."""
+    global _client
+    if _client is not None:
+        try:
+            await _client.aclose()
+        except Exception as exc:
+            log.warning("cache.close_failed", error=str(exc))
+        _client = None

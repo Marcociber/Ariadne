@@ -4,16 +4,23 @@ Importing this package automatically registers all modules
 
 To add a new module: create it in this folder and import it here.
 """
-from . import dns_module        # noqa: F401
-from . import whois_module      # noqa: F401
-from . import crtsh_module      # noqa: F401
-from . import http_module       # noqa: F401
-from . import wayback_module    # noqa: F401
-from . import email_module      # noqa: F401
-from . import username_module   # noqa: F401
-from . import github_module     # noqa: F401
-from . import phone_module      # noqa: F401
-from . import ip_module         # noqa: F401
-# Optional, key-based modules (skipped automatically when their key is unset).
-from . import shodan_module     # noqa: F401
-from . import hibp_module       # noqa: F401
+
+# `hibp` and `shodan` are optional, key-based modules: they register like any
+# other plugin and skip themselves automatically when their key is unset.
+from . import (
+    crtsh_module,  # noqa: F401
+    dns_module,  # noqa: F401
+    email_module,  # noqa: F401
+    github_module,  # noqa: F401
+    hibp_module,  # noqa: F401
+    http_module,  # noqa: F401
+    ip_module,  # noqa: F401
+    phone_module,  # noqa: F401
+    rdap_module,  # noqa: F401
+    robots_module,  # noqa: F401
+    shodan_module,  # noqa: F401
+    tls_module,  # noqa: F401
+    username_module,  # noqa: F401
+    wayback_module,  # noqa: F401
+    whois_module,  # noqa: F401
+)

@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # Python dependencies are pinned exactly, so they only move when Dependabot
+  # (or a human) says so.
+  - package-ecosystem: pip
+    directory: /osint-tool/backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      dev-dependencies:
+        patterns: ["pytest*", "ruff", "mypy", "bandit", "pip-audit", "respx", "schemathesis"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /osint-tool/backend
+    schedule:
+      interval: weekly

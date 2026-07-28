@@ -1,0 +1,22 @@
+# Without this file, `COPY app ./app` shipped the host's __pycache__ into the
+# image — bytecode compiled by a different CPython than the one in the image.
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Local environments and secrets must never enter the image.
+.venv/
+venv/
+.env
+*.db
+*.sqlite3
+*.log
+
+# Dev-only files
+tests/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+requirements-dev.txt

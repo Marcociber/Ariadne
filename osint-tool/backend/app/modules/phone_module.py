@@ -7,6 +7,9 @@ Also generates OSINT pivot links (WhatsApp, Telegram, Truecaller,
 web search) constructed from the number — without making any external
 requests. They are starting points for manual follow-up.
 """
+
+from urllib.parse import quote
+
 import phonenumbers
 from phonenumbers import carrier, geocoder, timezone
 
@@ -15,7 +18,7 @@ from ..core.models import Finding, TargetType
 
 
 def _flag(region_code: str) -> str:
-    """Convierte un código ISO alfa-2 (ej. 'ES') en su emoji de bandera."""
+    """Turn an ISO alpha-2 code (e.g. 'ES') into its flag emoji."""
     if not region_code or len(region_code) != 2:
         return ""
     return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in region_code.upper())
@@ -41,24 +44,24 @@ class PhoneModule(OSINTModule):
     }
 
     async def _run(self, target: str) -> list[Finding]:
-        # phonenumbers necesita el número con prefijo internacional.
+        # phonenumbers needs the number with its international prefix.
         num = target if target.strip().startswith("+") else "+" + target.strip()
         parsed = phonenumbers.parse(num, None)
 
         findings: list[Finding] = []
 
-        # ¿Tiene una estructura posible en algún plan de numeración?
+        # Does it have a possible structure in any numbering plan?
         possible = phonenumbers.is_possible_number(parsed)
         valid = phonenumbers.is_valid_number(parsed)
-        findings.append(
-            Finding(label="Valid", value="Yes" if valid else "No", category="phone")
-        )
+        findings.append(Finding(label="Valid", value="Yes" if valid else "No", category="phone"))
         if not valid:
-            findings.append(Finding(
-                label="Possible structure",
-                value="Yes (plausible length but not assigned)" if possible else "No",
-                category="phone",
-            ))
+            findings.append(
+                Finding(
+                    label="Possible structure",
+                    value="Yes (plausible length but not assigned)" if possible else "No",
+                    category="phone",
+                )
+            )
             return findings
 
         e164 = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
@@ -66,18 +69,20 @@ class PhoneModule(OSINTModule):
 
         # --- Identidad del número ---
         findings.append(Finding(label="E.164 format", value=e164, category="phone"))
-        findings.append(Finding(
-            label="International format",
-            value=phonenumbers.format_number(
-                parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL),
-            category="phone",
-        ))
-        findings.append(Finding(
-            label="National format",
-            value=phonenumbers.format_number(
-                parsed, phonenumbers.PhoneNumberFormat.NATIONAL),
-            category="phone",
-        ))
+        findings.append(
+            Finding(
+                label="International format",
+                value=phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL),
+                category="phone",
+            )
+        )
+        findings.append(
+            Finding(
+                label="National format",
+                value=phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL),
+                category="phone",
+            )
+        )
 
         # --- Country / geography ---
         cc = parsed.country_code
@@ -101,9 +106,14 @@ class PhoneModule(OSINTModule):
         # mobiles and with low confidence.
         car = carrier.name_for_number(parsed, "en") if mobile_capable else ""
         if car:
-            findings.append(Finding(
-                label="Carrier (original block, no portability)",
-                value=car, category="carrier", confidence=0.6))
+            findings.append(
+                Finding(
+                    label="Carrier (original block, no portability)",
+                    value=car,
+                    category="carrier",
+                    confidence=0.6,
+                )
+            )
 
         tzs = list(timezone.time_zones_for_number(parsed))
         for tz in tzs:
@@ -114,17 +124,12 @@ class PhoneModule(OSINTModule):
         findings.append(Finding(label="Line type", value=line_type, category="phone"))
 
         national = phonenumbers.national_significant_number(parsed)
-        findings.append(Finding(
-            label="National number", value=national, category="phone"))
-        findings.append(Finding(
-            label="Length (national)", value=str(len(national)), category="phone"))
+        findings.append(Finding(label="National number", value=national, category="phone"))
+        findings.append(Finding(label="Length (national)", value=str(len(national)), category="phone"))
 
         # --- OSINT pivot links (only constructed, not queried) ---
-        from urllib.parse import quote
-
         digits = e164.lstrip("+")
-        national_fmt = phonenumbers.format_number(
-            parsed, phonenumbers.PhoneNumberFormat.NATIONAL)
+        national_fmt = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL)
 
         pivots: list[tuple[str, str]] = []
         # WhatsApp and Telegram require a MOBILE number: it's pointless
@@ -133,11 +138,14 @@ class PhoneModule(OSINTModule):
             pivots.append(("Check on WhatsApp", f"https://wa.me/{digits}"))
             pivots.append(("Check on Telegram", f"https://t.me/+{digits}"))
         # Truecaller and web search apply to any valid number.
-        pivots.append(("Check on Truecaller", f"https://www.truecaller.com/search/{region_code.lower() or 'intl'}/{national}"))
+        region = region_code.lower() or "intl"
+        search = "https://www.google.com/search?q="
+        pivots.append(("Check on Truecaller", f"https://www.truecaller.com/search/{region}/{national}"))
         pivots.append(("Reverse lookup (Sync.me)", f"https://sync.me/search/?number={quote(e164)}"))
         pivots.append(("Search on Facebook", f"https://www.facebook.com/search/top?q={quote(e164)}"))
-        pivots.append(("Web search (E.164)", f"https://www.google.com/search?q={quote(chr(34) + e164 + chr(34))}"))
-        pivots.append(("Web search (local format)", f"https://www.google.com/search?q={quote(chr(34) + national_fmt + chr(34))}"))
+        # Quoted so the search engine matches the number exactly.
+        pivots.append(("Web search (E.164)", search + quote('"' + e164 + '"')))
+        pivots.append(("Web search (local format)", search + quote('"' + national_fmt + '"')))
 
         for label, url in pivots:
             findings.append(Finding(label=label, value=url, category="pivot", confidence=0.5))

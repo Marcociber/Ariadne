@@ -1,0 +1,14 @@
+/**
+ * Optional deployment config.
+ *
+ * Copy this file to `assets/config.js` and load it BEFORE app.js when the
+ * backend does not live at http://127.0.0.1:8000:
+ *
+ *   <script src="assets/config.js"></script>
+ *   <script type="module" src="assets/app.js"></script>
+ *
+ * Precedence: the ⚙ Settings panel (localStorage) overrides this value,
+ * which overrides the <meta name="ariadne-api"> tag, which overrides the
+ * built-in localhost default.
+ */
+window.ARIADNE_API = "https://ariadne-api.example.com";

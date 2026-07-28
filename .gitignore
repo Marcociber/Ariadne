@@ -8,4 +8,15 @@ venv/
 node_modules/
 # Local scan-history database (SQLite)
 *.db
+*.db-wal
+*.db-shm
 ariadne_history.db
+# Tooling caches and reports
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+# Deployment-specific frontend config (copy assets/config.js.example)
+assets/config.js

@@ -1,0 +1,94 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ariadne-backend"
+version = "0.2.0"
+description = "OSINT dashboard backend: aggregates free sources behind one API."
+readme = "../../README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dynamic = ["dependencies", "optional-dependencies"]
+
+[tool.setuptools]
+packages = ["app", "app.core", "app.modules"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+optional-dependencies.dev = { file = ["requirements-dev.txt"] }
+
+# ---------------------------------------------------------------------------
+# Ruff: linter + formatter (replaces flake8 + isort + black)
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+exclude = [".venv", "__pycache__"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "W",    # pycodestyle warnings
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "B008",   # FastAPI dependency defaults in signatures are idiomatic
+    "SIM105", # contextlib.suppress is not always clearer than try/except
+    # `supported_types = [TargetType.DOMAIN]` is the documented plugin contract
+    # (README + CONTRIBUTING). Requiring ClassVar there would complicate the
+    # one thing this project asks a contributor to write.
+    "RUF012",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+# ---------------------------------------------------------------------------
+# mypy: strict on the core, lenient on third-party sources without stubs
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "app.core.*"
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+warn_return_any = true
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Resolved relative to the rootdir, so `app` imports whether pytest is run
+# from backend/ or from the repository root.
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["*/__init__.py"]
+
+# ---------------------------------------------------------------------------
+# bandit: static security analysis
+# ---------------------------------------------------------------------------
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]

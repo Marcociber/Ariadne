@@ -3,248 +3,36 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ARIADNE</title>
-<style>
-  :root {
-    --bg: #0d1117; --panel: #161b22; --panel-2: #1c232c; --border: #30363d;
-    --text: #e6edf3; --muted: #8b949e; --accent: #2f81f7;
-    --green: #3fb950; --red: #f85149; --yellow: #d29922; --purple: #bc8cff;
-    --hi: rgba(210,153,34,.35);
-  }
-  :root[data-theme="light"] {
-    --bg: #f6f8fa; --panel: #ffffff; --panel-2: #f0f3f6; --border: #d0d7de;
-    --text: #1f2328; --muted: #59636e; --accent: #0969da;
-    --green: #1a7f37; --red: #cf222e; --yellow: #9a6700; --purple: #8250df;
-    --hi: rgba(154,103,0,.30);
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    line-height: 1.5;
-    background:
-      radial-gradient(1200px 700px at 15% -10%, rgba(47,129,247,.10), transparent 60%),
-      radial-gradient(1000px 600px at 100% 0%, rgba(188,140,255,.08), transparent 55%),
-      radial-gradient(900px 900px at 50% 120%, rgba(57,197,207,.06), transparent 60%),
-      var(--bg);
-    min-height: 100vh;
-  }
-  /* Background canvas: node network (ARIADNE philosophy — threads connecting data) */
-  #bg-canvas {
-    position: fixed; inset: 0; width: 100%; height: 100%;
-    z-index: 0; pointer-events: none; opacity: .55;
-  }
-  .container { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 32px 20px; }
-  header h1 { margin: 0 0 4px; font-size: 26px; }
-  header p { margin: 0 0 24px; color: var(--muted); font-size: 14px; }
-  /* Target type selector */
-  .type-picker { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-  .type-chip {
-    display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px;
-    background: var(--panel); border: 1px solid var(--border); border-radius: 20px;
-    color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer;
-    transition: border-color .15s, color .15s, background .15s;
-  }
-  .type-chip:hover { border-color: var(--accent); color: var(--text); }
-  .type-chip.active { background: rgba(47,129,247,.15); border-color: var(--accent); color: var(--accent); }
-  .search-box { display: flex; gap: 10px; margin-bottom: 8px; }
-  input[type=text] {
-    flex: 1; padding: 12px 16px; font-size: 15px; background: var(--panel);
-    border: 1px solid var(--border); border-radius: 8px; color: var(--text); outline: none;
-  }
-  input[type=text]:focus { border-color: var(--accent); }
-  /* Country code dropdown (phone only) — custom, with flag images */
-  .cc-dropdown { position: relative; flex: none; }
-  .cc-toggle {
-    display: flex; align-items: center; gap: 8px;
-    padding: 12px 14px; font-size: 15px; background: var(--panel);
-    border: 1px solid var(--border); border-radius: 8px; color: var(--text);
-    cursor: pointer; white-space: nowrap; min-width: 108px;
-  }
-  .cc-toggle:focus, .cc-dropdown.open .cc-toggle { border-color: var(--accent); }
-  .cc-flag { width: 22px; height: 16px; object-fit: cover; border-radius: 2px; flex: none; }
-  .cc-caret { margin-left: auto; color: var(--muted); font-size: 11px; }
-  .cc-menu {
-    position: absolute; top: calc(100% + 4px); left: 0; z-index: 30;
-    width: 300px; max-height: 320px; overflow-y: auto; padding: 6px;
-    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0,0,0,.45); display: none;
-  }
-  .cc-dropdown.open .cc-menu { display: block; }
-  .cc-search {
-    width: 100%; box-sizing: border-box; padding: 8px 10px; margin-bottom: 6px;
-    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
-    color: var(--text); font-size: 14px; outline: none;
-  }
-  .cc-list { list-style: none; margin: 0; padding: 0; }
-  .cc-item {
-    display: flex; align-items: center; gap: 10px; padding: 8px 10px;
-    border-radius: 6px; cursor: pointer; font-size: 14px; color: var(--text);
-  }
-  .cc-item:hover { background: rgba(47,129,247,.15); }
-  .cc-item .cc-name { flex: 1; }
-  .cc-item .cc-dial { color: var(--muted); font-size: 13px; }
-  .cc-item.hidden { display: none; }
-  button {
-    padding: 12px 24px; font-size: 15px; font-weight: 600; background: var(--accent);
-    color: #fff; border: none; border-radius: 8px; cursor: pointer;
-  }
-  button:disabled { opacity: .6; cursor: not-allowed; }
-  .hint { font-size: 12px; color: var(--muted); margin-bottom: 24px; }
-  .meta { display: flex; gap: 16px; margin: 20px 0 12px; font-size: 13px; color: var(--muted); flex-wrap: wrap; align-items: center; }
-  .badge {
-    display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px;
-    font-weight: 600; background: rgba(47,129,247,.15); color: var(--accent);
-  }
-  /* View toggle */
-  .view-toggle { margin-left: auto; display: flex; gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-  .view-toggle button {
-    background: var(--panel); color: var(--muted); padding: 6px 16px;
-    font-size: 13px; border-radius: 0; font-weight: 500;
-  }
-  .view-toggle button.active { background: var(--accent); color: #fff; }
-  /* List view */
-  .module-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 14px; overflow: hidden; }
-  .module-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
-  .module-name { font-weight: 700; text-transform: uppercase; font-size: 13px; letter-spacing: .5px; }
-  .status { font-size: 12px; font-weight: 600; }
-  .status.ok { color: var(--green); } .status.empty { color: var(--muted); } .status.error { color: var(--red); }
-  .findings { padding: 6px 16px 14px; }
-  .finding { display: flex; gap: 10px; padding: 6px 0; font-size: 14px; border-bottom: 1px solid rgba(48,54,61,.5); }
-  .finding:last-child { border-bottom: none; }
-  .finding .label { color: var(--muted); min-width: 150px; }
-  .finding .value { word-break: break-all; }
-  .finding a { color: var(--accent); text-decoration: none; }
-  .cat { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: rgba(139,148,158,.15); color: var(--muted); align-self: center; }
-  .correlations { background: rgba(210,153,34,.08); border: 1px solid rgba(210,153,34,.3); border-radius: 10px; padding: 14px 16px; margin: 18px 0; }
-  .correlations h3 { margin: 0 0 8px; font-size: 14px; color: var(--yellow); }
-  .empty-state { text-align: center; color: var(--muted); padding: 40px; }
-  .spinner { width: 20px; height: 20px; border: 3px solid rgba(255,255,255,.2); border-top-color: #fff; border-radius: 50%; display: inline-block; animation: spin .8s linear infinite; vertical-align: middle; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  /* Vista grafo */
-  #graph-wrap { position: relative; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
-  #graph { display: block; width: 100%; height: 560px; cursor: grab; }
-  #graph:active { cursor: grabbing; }
-  .graph-legend { position: absolute; top: 12px; left: 12px; background: rgba(13,17,23,.85); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 12px; }
-  .graph-legend div { display: flex; align-items: center; gap: 8px; margin: 3px 0; color: var(--muted); }
-  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
-  .graph-tip { position: absolute; bottom: 12px; right: 12px; font-size: 11px; color: var(--muted); background: rgba(13,17,23,.85); padding: 4px 8px; border-radius: 6px; }
-  .node-tooltip { position: absolute; pointer-events: none; background: #000; border: 1px solid var(--accent); border-radius: 6px; padding: 6px 10px; font-size: 12px; max-width: 280px; word-break: break-all; display: none; z-index: 10; }
-  /* Header toolbar */
-  .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-  .toolbar { display: flex; gap: 8px; flex: none; }
-  .tool-btn {
-    padding: 8px 14px; font-size: 13px; font-weight: 600; background: var(--panel);
-    color: var(--text); border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
-  }
-  .tool-btn:hover { border-color: var(--accent); color: var(--accent); }
-  /* Small action buttons in the results meta bar */
-  .meta .act {
-    padding: 5px 12px; font-size: 12px; font-weight: 600; background: var(--panel);
-    color: var(--text); border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
-  }
-  .meta .act:hover { border-color: var(--accent); color: var(--accent); }
-  .badge.cached { background: rgba(63,185,80,.15); color: var(--green); }
-  /* History panel */
-  #history-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 18px; overflow: hidden; display: none; }
-  #history-panel.open { display: block; }
-  .hist-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
-  .hist-head h3 { margin: 0; font-size: 14px; }
-  .hist-item {
-    display: flex; align-items: center; gap: 12px; padding: 10px 16px;
-    border-bottom: 1px solid rgba(48,54,61,.5); cursor: pointer; font-size: 13px;
-  }
-  .hist-item:last-child { border-bottom: none; }
-  .hist-item:hover { background: rgba(47,129,247,.1); }
-  .hist-item .h-target { font-weight: 600; flex: 1; word-break: break-all; }
-  .hist-item .h-meta { color: var(--muted); font-size: 12px; white-space: nowrap; }
-  .hist-empty { padding: 20px 16px; color: var(--muted); text-align: center; font-size: 13px; }
-  /* ---------- Results search / filter toolbar ---------- */
-  .res-controls {
-    position: sticky; top: 0; z-index: 5; background: var(--bg);
-    padding: 12px 0 10px; margin-bottom: 4px; border-bottom: 1px solid var(--border);
-  }
-  .res-search-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
-  .res-search {
-    flex: 1; padding: 10px 14px 10px 36px; font-size: 14px; background: var(--panel);
-    border: 1px solid var(--border); border-radius: 8px; color: var(--text); outline: none;
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2'><circle cx='11' cy='11' r='7'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>");
-    background-repeat: no-repeat; background-position: 12px center;
-  }
-  .res-search:focus { border-color: var(--accent); }
-  .res-clear {
-    padding: 9px 12px; font-size: 13px; font-weight: 600; background: var(--panel);
-    color: var(--muted); border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
-  }
-  .res-clear:hover { border-color: var(--accent); color: var(--accent); }
-  .cat-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-  .cat-chip {
-    padding: 5px 11px; font-size: 12px; font-weight: 600; background: var(--panel);
-    border: 1px solid var(--border); border-radius: 14px; color: var(--muted);
-    cursor: pointer; transition: border-color .12s, color .12s, background .12s;
-  }
-  .cat-chip:hover { border-color: var(--accent); color: var(--text); }
-  .cat-chip.active { background: rgba(47,129,247,.15); border-color: var(--accent); color: var(--accent); }
-  .cat-chip .n { opacity: .65; margin-left: 4px; font-weight: 500; }
-  .res-count { font-size: 12px; color: var(--muted); margin-left: auto; white-space: nowrap; }
-  mark { background: var(--hi); color: inherit; border-radius: 3px; padding: 0 1px; }
-  /* Collapsible module head + finding copy affordance */
-  .module-head { cursor: pointer; user-select: none; }
-  .module-head .chevron { transition: transform .15s; color: var(--muted); font-size: 11px; margin-left: 8px; }
-  .module-card.collapsed .findings { display: none; }
-  .module-card.collapsed .chevron { transform: rotate(-90deg); }
-  .module-head-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .finding { position: relative; align-items: baseline; }
-  .finding .value { flex: 1; }
-  .copy-btn {
-    flex: none; opacity: 0; border: none; background: transparent; cursor: pointer;
-    color: var(--muted); font-size: 12px; padding: 2px 6px; border-radius: 5px; transition: opacity .12s;
-  }
-  .finding:hover .copy-btn { opacity: 1; }
-  .copy-btn:hover { background: rgba(139,148,158,.18); color: var(--text); }
-  .copy-btn.done { color: var(--green); opacity: 1; }
-  /* Summary stat tiles */
-  .summary { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 4px; }
-  .stat {
-    flex: 1; min-width: 120px; background: var(--panel); border: 1px solid var(--border);
-    border-radius: 10px; padding: 12px 14px;
-  }
-  .stat .num { font-size: 22px; font-weight: 700; line-height: 1.1; }
-  .stat .lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .no-match { text-align: center; color: var(--muted); padding: 30px; font-size: 14px; }
-  /* Responsive */
-  @media (max-width: 640px) {
-    .container { padding: 20px 14px; }
-    header h1 { font-size: 22px; }
-    .header-row { flex-direction: column; }
-    .toolbar { width: 100%; }
-    .search-box { flex-wrap: wrap; }
-    .search-box input[type=text] { min-width: 0; }
-    .cc-menu { width: min(300px, 86vw); }
-    .finding { flex-direction: column; gap: 2px; }
-    .finding .label { min-width: 0; font-size: 13px; }
-    .copy-btn { opacity: 1; position: absolute; top: 4px; right: 0; }
-    .meta { gap: 10px; }
-    .view-toggle { margin-left: 0; }
-    .res-count { margin-left: 0; width: 100%; }
-    #graph { height: 420px; }
-    .stat { min-width: calc(50% - 5px); }
-  }
-  /* Print / PDF export */
-  @media print {
-    body { background: #fff !important; color: #000 !important; }
-    #bg-canvas, .toolbar, .type-picker, .search-box, .hint, .view-toggle,
-    .meta .act, #history-panel, .graph-tip, .res-controls, .copy-btn { display: none !important; }
-    .module-card.collapsed .findings { display: block !important; }
-    .container { max-width: 100%; }
-    .module-card, .correlations { break-inside: avoid; border-color: #ccc; }
-    a { color: #000; text-decoration: underline; }
-    .badge { border: 1px solid #999; color: #000; background: none; }
-  }
-</style>
+<title>ARIADNE — OSINT dashboard</title>
+<meta name="description" content="ARIADNE is an open-source intelligence dashboard: enter a domain, email, username, phone or IP and it queries every compatible free source in parallel, then correlates the results." />
+<meta name="color-scheme" content="dark light" />
+
+<!-- Link previews -->
+<meta property="og:type" content="website" />
+<meta property="og:title" content="ARIADNE — OSINT dashboard" />
+<meta property="og:description" content="Aggregates multiple free OSINT sources into one API and one panel, with a correlation engine and an interactive graph." />
+<meta property="og:image" content="osint-tool/docs/graph-domain.png" />
+<meta name="twitter:card" content="summary_large_image" />
+
+<!-- Inline SVG favicon: the Ariadne thread. No external request. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%230d1117'/%3E%3Cpath d='M8 22 L16 10 L24 22' stroke='%232f81f7' stroke-width='2' fill='none'/%3E%3Ccircle cx='8' cy='22' r='3' fill='%23bc8cff'/%3E%3Ccircle cx='24' cy='22' r='3' fill='%2339c5cf'/%3E%3Ccircle cx='16' cy='10' r='3.5' fill='%23e6edf3'/%3E%3C/svg%3E" />
+
+<!--
+  The API base URL is NOT hard-coded any more. It is resolved, in order:
+    1. localStorage key `ariadne-api`   (set from the ⚙ Settings panel)
+    2. window.ARIADNE_API               (define it in assets/config.js)
+    3. the content of the meta tag below (edit it when you deploy)
+    4. http://127.0.0.1:8000            (local development default)
+-->
+<meta name="ariadne-api" content="" />
+
+<link rel="stylesheet" href="assets/styles.css" />
 </head>
 <body>
-<canvas id="bg-canvas"></canvas>
+<canvas id="bg-canvas" aria-hidden="true"></canvas>
+
+<a class="skip-link" href="#target">Skip to the target field</a>
+
 <div class="container">
   <header>
     <div class="header-row">
@@ -253,711 +41,83 @@
         <p>Open-source intelligence dashboard — free, no API keys required</p>
       </div>
       <div class="toolbar">
-        <button class="tool-btn" id="theme-btn" onclick="toggleTheme()" title="Toggle light / dark">🌙 Theme</button>
-        <button class="tool-btn" onclick="toggleHistory()" title="Recent scans">🕘 History</button>
+        <button class="tool-btn" id="theme-btn" data-action="toggle-theme" aria-label="Switch between light and dark theme">🌙 <span class="btn-text">Theme</span></button>
+        <button class="tool-btn" data-action="toggle-history" aria-label="Show recent scans" aria-expanded="false" aria-controls="history-panel">🕘 <span class="btn-text">History</span></button>
+        <button class="tool-btn" data-action="toggle-settings" aria-label="Open connection settings" aria-expanded="false" aria-controls="settings-panel">⚙ <span class="btn-text">Settings</span></button>
       </div>
     </div>
   </header>
 
-  <div id="history-panel">
-    <div class="hist-head">
-      <h3>🕘 Scan history</h3>
-      <button class="act" onclick="toggleHistory()">Close</button>
-    </div>
-    <div id="history-list"></div>
-  </div>
+  <p class="legal" role="note">
+    ⚠️ <strong>Authorized use only.</strong> ARIADNE queries public sources. Use it
+    only against targets you own or have written permission to assess, and respect
+    each source's terms of service and the law that applies to you.
+  </p>
 
-  <div id="type-picker" class="type-picker"></div>
+  <section id="settings-panel" class="panel" hidden aria-labelledby="settings-title">
+    <div class="panel-head">
+      <h2 id="settings-title">⚙ Connection settings</h2>
+      <button class="act" data-action="toggle-settings">Close</button>
+    </div>
+    <div class="panel-body">
+      <label class="field">
+        <span>API base URL</span>
+        <input type="url" id="api-url" placeholder="http://127.0.0.1:8000" autocomplete="off" />
+        <small>Where the backend is reachable from this browser. Leave empty to use the default.</small>
+      </label>
+      <label class="field">
+        <span>API key <em>(only if the backend sets <code>API_KEY</code>)</em></span>
+        <input type="password" id="api-key" placeholder="none" autocomplete="off" />
+        <small>Sent as the <code>X-API-Key</code> header. Stored in this browser only.</small>
+      </label>
+      <label class="field">
+        <span>Sites checked per username scan</span>
+        <input type="number" id="max-sites" min="1" max="500" placeholder="server default" />
+        <small>Fewer sites = faster scans. This is the main driver of scan time.</small>
+      </label>
+      <div class="field-row">
+        <button class="act" data-action="save-settings">Save</button>
+        <span id="settings-status" class="hint" role="status" aria-live="polite"></span>
+      </div>
+    </div>
+  </section>
+
+  <section id="history-panel" class="panel" hidden aria-labelledby="history-title">
+    <div class="panel-head">
+      <h2 id="history-title">🕘 Scan history</h2>
+      <button class="act" data-action="toggle-history">Close</button>
+    </div>
+    <div id="history-list" class="panel-body-flush"></div>
+  </section>
+
+  <div id="type-picker" class="type-picker" role="group" aria-label="Target type"></div>
 
   <div class="search-box">
-    <div class="cc-dropdown" id="country-code" style="display:none">
-      <button type="button" class="cc-toggle" id="cc-toggle" onclick="toggleCC(event)" title="Country code" aria-haspopup="listbox">
-        <img class="cc-flag" id="cc-flag" alt="" onerror="this.style.display='none'">
+    <div class="cc-dropdown" id="country-code" hidden>
+      <button type="button" class="cc-toggle" id="cc-toggle" data-action="toggle-cc"
+              aria-haspopup="listbox" aria-expanded="false" aria-controls="cc-list"
+              aria-label="Country dialling code">
+        <img class="cc-flag" id="cc-flag" alt="" />
         <span id="cc-code">+34</span>
-        <span class="cc-caret">▾</span>
+        <span class="cc-caret" aria-hidden="true">▾</span>
       </button>
       <div class="cc-menu" id="cc-menu">
         <input type="text" class="cc-search" id="cc-search" placeholder="Search country…"
-               oninput="filterCC(this.value)" onclick="event.stopPropagation()">
-        <ul class="cc-list" id="cc-list"></ul>
+               aria-label="Search country" autocomplete="off" />
+        <ul class="cc-list" id="cc-list" role="listbox" aria-label="Country dialling codes"></ul>
       </div>
     </div>
+    <label class="visually-hidden" for="target">Target to scan</label>
     <input type="text" id="target" placeholder="Enter target…" inputmode="text"
-           oninput="onTargetInput(this)" onkeydown="if(event.key==='Enter')scan()" />
-    <button id="btn" onclick="scan()">Scan</button>
+           autocomplete="off" spellcheck="false" aria-describedby="hint" />
+    <button id="btn" data-action="scan">Scan</button>
+    <button id="cancel-btn" class="act cancel" data-action="cancel" hidden>Cancel</button>
   </div>
-  <div class="hint" id="hint"></div>
+  <p class="hint" id="hint"></p>
 
-  <div id="results"></div>
+  <main id="results" aria-live="polite" aria-busy="false"></main>
 </div>
 
-<script>
-const API = "http://127.0.0.1:8000";
-let lastData = null;
-let currentView = "list";
-let resFilter = { q: "", cat: "all" };   // results search + category filter
-const collapsedMods = new Set();          // modules the user has collapsed
-
-/* ---------- THEME (light / dark, persisted) ---------- */
-function applyTheme(t) {
-  document.documentElement.dataset.theme = t;
-  const btn = document.getElementById("theme-btn");
-  if (btn) btn.textContent = t === "light" ? "☀️ Theme" : "🌙 Theme";
-}
-function toggleTheme() {
-  const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
-  try { localStorage.setItem("ariadne-theme", next); } catch (e) {}
-  applyTheme(next);
-}
-(function initTheme() {
-  let saved = "dark";
-  try { saved = localStorage.getItem("ariadne-theme") || "dark"; } catch (e) {}
-  applyTheme(saved);
-})();
-
-/* ---------- TARGET TYPE SELECTOR ---------- */
-const TARGET_TYPES = [
-  { id: "auto",     label: "🎯 Auto",     placeholder: "Enter a target (type auto-detected)…",       hint: "The target type is detected automatically." },
-  { id: "domain",   label: "🌐 Domain",  placeholder: "example.com",                                     hint: "Queries DNS, WHOIS and subdomains (Certificate Transparency)." },
-  { id: "email",    label: "✉️ Email",    placeholder: "name@example.com",                              hint: "Searches Gravatar profile, associated accounts, and MX servers." },
-  { id: "username", label: "👤 Username", placeholder: "username",                                   hint: "Checks 150+ platforms (Maigret) and enriches a public GitHub profile." },
-  { id: "phone",    label: "📞 Phone", placeholder: "+34 600 000 000",                                 hint: "Country, carrier, line type, timezone, and OSINT pivots." },
-  { id: "ip",       label: "🖥️ IP",      placeholder: "8.8.8.8",                                         hint: "Geolocation, ISP/ASN, reverse DNS and reputation pivots (free, no key)." },
-];
-let currentType = "auto";
-
-/* Country codes (iso · flag · name · dial). Sorted by frequency + region. */
-const COUNTRY_CODES = [
-  { code: "+34",  iso: "es", flag: "🇪🇸", name: "Spain" },
-  { code: "+1",   iso: "us", flag: "🇺🇸", name: "United States / Canada" },
-  { code: "+52",  iso: "mx", flag: "🇲🇽", name: "Mexico" },
-  { code: "+54",  iso: "ar", flag: "🇦🇷", name: "Argentina" },
-  { code: "+55",  iso: "br", flag: "🇧🇷", name: "Brazil" },
-  { code: "+56",  iso: "cl", flag: "🇨🇱", name: "Chile" },
-  { code: "+57",  iso: "co", flag: "🇨🇴", name: "Colombia" },
-  { code: "+58",  iso: "ve", flag: "🇻🇪", name: "Venezuela" },
-  { code: "+51",  iso: "pe", flag: "🇵🇪", name: "Peru" },
-  { code: "+593", iso: "ec", flag: "🇪🇨", name: "Ecuador" },
-  { code: "+591", iso: "bo", flag: "🇧🇴", name: "Bolivia" },
-  { code: "+595", iso: "py", flag: "🇵🇾", name: "Paraguay" },
-  { code: "+598", iso: "uy", flag: "🇺🇾", name: "Uruguay" },
-  { code: "+502", iso: "gt", flag: "🇬🇹", name: "Guatemala" },
-  { code: "+503", iso: "sv", flag: "🇸🇻", name: "El Salvador" },
-  { code: "+504", iso: "hn", flag: "🇭🇳", name: "Honduras" },
-  { code: "+505", iso: "ni", flag: "🇳🇮", name: "Nicaragua" },
-  { code: "+506", iso: "cr", flag: "🇨🇷", name: "Costa Rica" },
-  { code: "+507", iso: "pa", flag: "🇵🇦", name: "Panama" },
-  { code: "+53",  iso: "cu", flag: "🇨🇺", name: "Cuba" },
-  { code: "+1809",iso: "do", flag: "🇩🇴", name: "Dominican Republic" },
-  { code: "+44",  iso: "gb", flag: "🇬🇧", name: "United Kingdom" },
-  { code: "+33",  iso: "fr", flag: "🇫🇷", name: "France" },
-  { code: "+49",  iso: "de", flag: "🇩🇪", name: "Germany" },
-  { code: "+39",  iso: "it", flag: "🇮🇹", name: "Italy" },
-  { code: "+351", iso: "pt", flag: "🇵🇹", name: "Portugal" },
-  { code: "+31",  iso: "nl", flag: "🇳🇱", name: "Netherlands" },
-  { code: "+32",  iso: "be", flag: "🇧🇪", name: "Belgium" },
-  { code: "+41",  iso: "ch", flag: "🇨🇭", name: "Switzerland" },
-  { code: "+43",  iso: "at", flag: "🇦🇹", name: "Austria" },
-  { code: "+353", iso: "ie", flag: "🇮🇪", name: "Ireland" },
-  { code: "+30",  iso: "gr", flag: "🇬🇷", name: "Greece" },
-  { code: "+48",  iso: "pl", flag: "🇵🇱", name: "Poland" },
-  { code: "+7",   iso: "ru", flag: "🇷🇺", name: "Russia" },
-  { code: "+380", iso: "ua", flag: "🇺🇦", name: "Ukraine" },
-  { code: "+90",  iso: "tr", flag: "🇹🇷", name: "Turkey" },
-  { code: "+212", iso: "ma", flag: "🇲🇦", name: "Morocco" },
-  { code: "+20",  iso: "eg", flag: "🇪🇬", name: "Egypt" },
-  { code: "+27",  iso: "za", flag: "🇿🇦", name: "South Africa" },
-  { code: "+91",  iso: "in", flag: "🇮🇳", name: "India" },
-  { code: "+86",  iso: "cn", flag: "🇨🇳", name: "China" },
-  { code: "+81",  iso: "jp", flag: "🇯🇵", name: "Japan" },
-  { code: "+82",  iso: "kr", flag: "🇰🇷", name: "South Korea" },
-  { code: "+61",  iso: "au", flag: "🇦🇺", name: "Australia" },
-  { code: "+64",  iso: "nz", flag: "🇳🇿", name: "New Zealand" },
-  { code: "+972", iso: "il", flag: "🇮🇱", name: "Israel" },
-  { code: "+971", iso: "ae", flag: "🇦🇪", name: "United Arab Emirates" },
-];
-
-let selectedDial = COUNTRY_CODES[0].code;
-
-/* Flag image URL (flagcdn); falls back to the emoji if the image can't load. */
-function flagImg(c, cls) {
-  return `<img class="${cls}" src="https://flagcdn.com/w40/${c.iso}.png" alt=""`
-       + ` onerror="this.replaceWith(document.createTextNode('${c.flag} '))">`;
-}
-
-function populateCountryCodes() {
-  const list = document.getElementById("cc-list");
-  list.innerHTML = COUNTRY_CODES.map((c, i) =>
-    `<li class="cc-item" data-name="${c.name.toLowerCase()}" data-dial="${c.code}" onclick="selectCC(${i})">
-       ${flagImg(c, "cc-flag")}
-       <span class="cc-name">${c.name}</span>
-       <span class="cc-dial">${c.code}</span>
-     </li>`
-  ).join("");
-  selectCC(0);
-}
-
-function selectCC(i) {
-  const c = COUNTRY_CODES[i];
-  selectedDial = c.code;
-  document.getElementById("cc-code").textContent = c.code;
-  const flag = document.getElementById("cc-flag");
-  flag.style.display = "";
-  flag.src = `https://flagcdn.com/w40/${c.iso}.png`;
-  flag.alt = c.name;
-  closeCC();
-}
-
-function toggleCC(e) {
-  e.stopPropagation();
-  const d = document.getElementById("country-code");
-  const opening = !d.classList.contains("open");
-  d.classList.toggle("open", opening);
-  if (opening) {
-    const s = document.getElementById("cc-search");
-    s.value = ""; filterCC(""); s.focus();
-  }
-}
-
-function closeCC() { document.getElementById("country-code").classList.remove("open"); }
-
-function filterCC(q) {
-  q = q.trim().toLowerCase();
-  document.querySelectorAll("#cc-list .cc-item").forEach(li => {
-    const match = li.dataset.name.includes(q) || li.dataset.dial.includes(q);
-    li.classList.toggle("hidden", !match);
-  });
-}
-
-/* Close the dropdown when clicking outside of it. */
-document.addEventListener("click", e => {
-  const d = document.getElementById("country-code");
-  if (d && !d.contains(e.target)) closeCC();
-});
-
-/* In phone mode, keep the target input numeric (digits and spaces only). */
-function onTargetInput(el) {
-  if (currentType !== "phone") return;
-  const cleaned = el.value.replace(/[^\d\s]/g, "");
-  if (cleaned !== el.value) el.value = cleaned;
-}
-
-function renderTypePicker() {
-  const picker = document.getElementById("type-picker");
-  picker.innerHTML = TARGET_TYPES.map(t =>
-    `<button class="type-chip ${t.id === currentType ? "active" : ""}" onclick="setType('${t.id}')">${t.label}</button>`
-  ).join("");
-  applyType();
-}
-
-function setType(id) { currentType = id; renderTypePicker(); document.getElementById("target").focus(); }
-
-function applyType() {
-  const t = TARGET_TYPES.find(x => x.id === currentType);
-  const isPhone = currentType === "phone";
-  const cc = document.getElementById("country-code");
-  cc.style.display = isPhone ? "block" : "none";
-  if (!isPhone) closeCC();
-  const input = document.getElementById("target");
-  input.placeholder = isPhone ? "600 000 000 (local number)" : t.placeholder;
-  input.setAttribute("inputmode", isPhone ? "numeric" : "text");
-  if (isPhone) onTargetInput(input);   // strip any letters left over from another mode
-  document.getElementById("hint").textContent = t.hint;
-}
-
-async function scan() {
-  let target = document.getElementById("target").value.trim();
-  if (!target) return;
-  // In phone mode, prepend the selected country code unless the user already entered an international prefix.
-  if (currentType === "phone" && !target.startsWith("+") && !target.startsWith("00")) {
-    target = selectedDial + " " + target;
-  }
-  const btn = document.getElementById("btn");
-  const results = document.getElementById("results");
-  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
-  results.innerHTML = '<div class="empty-state">Querying sources…</div>';
-  try {
-    const resp = await fetch(`${API}/scan`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target, target_type: currentType }),
-    });
-    lastData = await resp.json();
-    resFilter = { q: "", cat: "all" }; collapsedMods.clear();
-    renderAll();
-  } catch (e) {
-    results.innerHTML = `<div class="empty-state">Error connecting to the API.<br>Is the backend running at ${API}?</div>`;
-  } finally {
-    btn.disabled = false; btn.textContent = "Scan";
-  }
-}
-
-function renderAll() {
-  const data = lastData;
-  const results = document.getElementById("results");
-  let html = `<div class="meta">
-    <span>Target: <span class="badge">${escapeHtml(data.target)}</span></span>
-    <span>Type: <span class="badge">${data.target_type}</span></span>
-    <span>Time: ${data.total_elapsed_ms} ms</span>
-    ${data.cached ? '<span class="badge cached">⚡ cached</span>' : ''}
-    <button class="act" onclick="exportJSON()" title="Download as JSON">⬇ JSON</button>
-    <button class="act" onclick="exportPDF()" title="Save as PDF (print)">🖨 PDF</button>
-    <span class="view-toggle">
-      <button id="tab-list" class="${currentView==='list'?'active':''}" onclick="setView('list')">List</button>
-      <button id="tab-graph" class="${currentView==='graph'?'active':''}" onclick="setView('graph')">Graph</button>
-    </span>
-  </div><div id="view-body"></div>`;
-  results.innerHTML = html;
-  if (currentView === "list") renderList(); else renderGraph();
-}
-
-function setView(v) { currentView = v; renderAll(); }
-
-/* ---------- EXPORT ---------- */
-function exportJSON() {
-  if (!lastData) return;
-  const blob = new Blob([JSON.stringify(lastData, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  const safe = (lastData.target || "scan").replace(/[^a-z0-9._-]+/gi, "_");
-  a.href = url;
-  a.download = `ariadne_${safe}.json`;
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
-}
-
-function exportPDF() {
-  if (!lastData) return;
-  if (currentView !== "list") setView("list");  // print the readable list view
-  setTimeout(() => window.print(), 50);          // let the DOM settle first
-}
-
-/* ---------- HISTORY ---------- */
-async function toggleHistory() {
-  const panel = document.getElementById("history-panel");
-  const opening = !panel.classList.contains("open");
-  panel.classList.toggle("open", opening);
-  if (opening) await loadHistory();
-}
-
-async function loadHistory() {
-  const list = document.getElementById("history-list");
-  list.innerHTML = `<div class="hist-empty">Loading…</div>`;
-  try {
-    const resp = await fetch(`${API}/history?limit=50`);
-    const items = await resp.json();
-    if (!items.length) { list.innerHTML = `<div class="hist-empty">No scans yet.</div>`; return; }
-    list.innerHTML = items.map(it => {
-      const when = (it.created_at || "").replace("T", " ").replace(/(\+00:00|Z)$/, " UTC");
-      return `<div class="hist-item" onclick="openHistoryScan(${it.id})">
-        <span class="h-target">${escapeHtml(it.target)}</span>
-        <span class="badge">${it.target_type}</span>
-        <span class="h-meta">${it.findings_count} findings · ${when}</span>
-      </div>`;
-    }).join("");
-  } catch (e) {
-    list.innerHTML = `<div class="hist-empty">Could not load history (is the backend running?).</div>`;
-  }
-}
-
-async function openHistoryScan(id) {
-  try {
-    const resp = await fetch(`${API}/history/${id}`);
-    if (!resp.ok) return;
-    lastData = await resp.json();
-    resFilter = { q: "", cat: "all" }; collapsedMods.clear();
-    document.getElementById("history-panel").classList.remove("open");
-    renderAll();
-    document.getElementById("results").scrollIntoView({ behavior: "smooth" });
-  } catch (e) { /* ignore */ }
-}
-
-/* ---------- LIST VIEW (summary + search + category filters) ---------- */
-function categoryCounts(data) {
-  const counts = {};
-  for (const r of data.results)
-    for (const f of r.findings) counts[f.category] = (counts[f.category] || 0) + 1;
-  return counts;
-}
-
-function renderList() {
-  const data = lastData;
-  const body = document.getElementById("view-body");
-  const totalFindings = data.results.reduce((a, r) => a + r.findings.length, 0);
-  const modsWithData = data.results.filter(r => r.findings.length).length;
-  const cats = categoryCounts(data);
-  const catCount = Object.keys(cats).length;
-
-  let html = "";
-
-  // Summary stat tiles — a quick, readable overview of the scan.
-  html += `<div class="summary">
-    <div class="stat"><div class="num">${totalFindings}</div><div class="lbl">findings</div></div>
-    <div class="stat"><div class="num">${modsWithData}/${data.results.length}</div><div class="lbl">sources with data</div></div>
-    <div class="stat"><div class="num">${catCount}</div><div class="lbl">categories</div></div>
-    <div class="stat"><div class="num">${data.total_elapsed_ms}<span style="font-size:13px"> ms</span></div><div class="lbl">scan time</div></div>
-  </div>`;
-
-  // Correlations across modules.
-  if (data.correlations && data.correlations.length) {
-    html += `<div class="correlations"><h3>⚡ Correlations detected</h3>`;
-    for (const c of data.correlations) {
-      html += `<div>${escapeHtml(c.description)}: <b>${c.linked_values.map(escapeHtml).join(", ")}</b>
-        <span class="cat">${c.modules.join(" + ")}</span></div>`;
-    }
-    html += `</div>`;
-  }
-
-  // Search + category filters (only when there is something to filter).
-  if (totalFindings) {
-    const chips = [
-      `<button class="cat-chip ${resFilter.cat === 'all' ? 'active' : ''}" onclick="setCat('all')">All<span class="n">${totalFindings}</span></button>`
-    ].concat(
-      Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([c, n]) =>
-        `<button class="cat-chip ${resFilter.cat === c ? 'active' : ''}" onclick="setCat('${encodeURIComponent(c)}')">${escapeHtml(c)}<span class="n">${n}</span></button>`)
-    );
-    html += `<div class="res-controls">
-      <div class="res-search-row">
-        <input class="res-search" id="res-search" placeholder="Filter findings by text (label or value)…"
-               value="${escapeHtml(resFilter.q)}" oninput="onResSearch(this.value)">
-        <button class="res-clear" onclick="clearResFilter()">Clear</button>
-      </div>
-      <div class="cat-filters">${chips.join("")}<span class="res-count" id="res-count"></span></div>
-    </div>`;
-  }
-
-  html += `<div id="findings-body"></div>`;
-  body.innerHTML = html;
-  filterFindings();
-}
-
-/* Rebuilds only the findings list (keeps the search box focused while typing). */
-function filterFindings() {
-  const data = lastData;
-  const fb = document.getElementById("findings-body");
-  if (!fb) return;
-  if (!data.results.length) { fb.innerHTML = `<div class="empty-state">No modules for this target type.</div>`; return; }
-
-  const q = resFilter.q.trim().toLowerCase();
-  const cat = resFilter.cat;
-  const filtering = !!q || cat !== "all";
-  let shown = 0, total = 0, html = "";
-
-  for (const r of data.results) {
-    total += r.findings.length;
-    const matched = r.findings.filter(f => {
-      if (cat !== "all" && f.category !== cat) return false;
-      if (q && !(`${f.label} ${f.value}`.toLowerCase().includes(q))) return false;
-      return true;
-    });
-    if (filtering && matched.length === 0) continue;   // hide modules with no match
-    shown += matched.length;
-
-    const collapsed = collapsedMods.has(r.module) ? "collapsed" : "";
-    const color = MODULE_COLORS[r.module] || "#8b949e";
-    html += `<div class="module-card ${collapsed}"><div class="module-head" onclick="toggleMod('${r.module}')">
-      <span class="module-head-left">
-        <span class="module-name" style="color:${color}">${escapeHtml(r.module)}</span>
-        <span class="status ${r.status}">${statusLabel(r)}</span>
-      </span>
-      <span class="chevron">▾</span></div>`;
-    if (matched.length) {
-      html += `<div class="findings">`;
-      for (const f of matched) {
-        html += `<div class="finding">
-          <span class="label">${hl(f.label, q)}</span>
-          <span class="value">${valueHtml(f.value, q)}</span>
-          <span class="cat">${escapeHtml(f.category)}</span>
-          <button class="copy-btn" title="Copy value" data-val="${escapeHtml(f.value)}" onclick="copyVal(event, this)">⧉</button>
-        </div>`;
-      }
-      html += `</div>`;
-    }
-    html += `</div>`;
-  }
-
-  if (filtering && shown === 0) {
-    html = `<div class="no-match">No findings match your filter.</div>`;
-  }
-  fb.innerHTML = html;
-
-  const rc = document.getElementById("res-count");
-  if (rc) rc.textContent = filtering ? `${shown} of ${total} shown` : `${total} findings`;
-}
-
-function onResSearch(v) { resFilter.q = v; filterFindings(); }
-function clearResFilter() { resFilter = { q: "", cat: "all" }; renderList(); }
-function setCat(c) { resFilter.cat = c === "all" ? "all" : decodeURIComponent(c); renderList(); }
-function toggleMod(m) {
-  if (collapsedMods.has(m)) collapsedMods.delete(m); else collapsedMods.add(m);
-  filterFindings();
-}
-
-function copyVal(e, btn) {
-  e.stopPropagation();
-  const val = btn.dataset.val;
-  const done = () => {
-    btn.textContent = "✓"; btn.classList.add("done");
-    setTimeout(() => { btn.textContent = "⧉"; btn.classList.remove("done"); }, 1000);
-  };
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(val).then(done).catch(() => {});
-  }
-}
-
-/* Highlight the query inside escaped text (labels + plain values). */
-function hl(text, q) {
-  const s = escapeHtml(String(text));
-  if (!q) return s;
-  const needle = escapeHtml(q).toLowerCase();
-  if (!needle) return s;
-  const low = s.toLowerCase();
-  let out = "", idx = 0, pos;
-  while ((pos = low.indexOf(needle, idx)) !== -1) {
-    out += s.slice(idx, pos) + "<mark>" + s.slice(pos, pos + needle.length) + "</mark>";
-    idx = pos + needle.length;
-  }
-  return out + s.slice(idx);
-}
-
-/* Links stay clickable; non-URL values get search highlighting. */
-function valueHtml(v, q) {
-  if (/^https?:\/\//.test(v)) {
-    const safe = escapeHtml(v);
-    return `<a href="${safe}" target="_blank" rel="noopener">${safe}</a>`;
-  }
-  return hl(v, q);
-}
-
-/* ---------- GRAPH VIEW (force-directed on canvas, no libraries) ---------- */
-const MODULE_COLORS = {
-  dns:"#2f81f7", whois:"#3fb950", crtsh:"#bc8cff",
-  email:"#d29922", username:"#f85149", phone:"#39c5cf",
-  github:"#db61a2", http:"#e3b341", wayback:"#a371f7",
-  ip:"#40c463", shodan:"#f0883e", hibp:"#f85149"
-};
-
-function buildGraph(data) {
-  const nodes = [], links = [];
-  const W = 900, H = 560;
-  // Central node: the target
-  nodes.push({ id:"__target__", label:data.target, type:"target", x:W/2, y:H/2, r:26, color:"#fff" });
-
-  const correlated = new Set();
-  for (const c of (data.correlations||[]))
-    for (const v of c.linked_values) correlated.add(v.toLowerCase());
-
-  for (const res of data.results) {
-    if (!res.findings.length) continue;
-    const modId = "mod__" + res.module;
-    nodes.push({ id:modId, label:res.module, type:"module", r:16,
-      color: MODULE_COLORS[res.module]||"#8b949e",
-      x: W/2 + (Math.random()-.5)*200, y: H/2 + (Math.random()-.5)*200 });
-    links.push({ source:"__target__", target:modId, strong:true });
-
-    res.findings.forEach((f, i) => {
-      const fid = modId + "__" + i;
-      const isCorr = correlated.has((f.value||"").toLowerCase());
-      nodes.push({ id:fid, label:f.value, sub:f.label, type:"finding",
-        r: isCorr?9:6, color: isCorr ? "#d29922" : (MODULE_COLORS[res.module]||"#8b949e"),
-        corr:isCorr, x: W/2 + (Math.random()-.5)*400, y: H/2 + (Math.random()-.5)*400 });
-      links.push({ source:modId, target:fid, strong:false, corr:isCorr });
-    });
-  }
-  return { nodes, links, W, H };
-}
-
-let graphState = null;
-
-function renderGraph() {
-  const data = lastData;
-  const body = document.getElementById("view-body");
-  const hasFindings = data.results.some(r => r.findings.length);
-  if (!hasFindings) { body.innerHTML = `<div class="empty-state">No data to graph.</div>`; return; }
-
-  body.innerHTML = `
-    <div id="graph-wrap">
-      <canvas id="graph"></canvas>
-      <div class="graph-legend" id="legend"></div>
-      <div class="graph-tip">Drag nodes · hover to see value</div>
-      <div class="node-tooltip" id="tooltip"></div>
-    </div>`;
-
-  const g = buildGraph(data);
-  const canvas = document.getElementById("graph");
-  const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr; canvas.height = 560 * dpr;
-  const ctx = canvas.getContext("2d"); ctx.scale(dpr, dpr);
-  const VW = rect.width, VH = 560;
-  // Rescale initial positions to actual width
-  g.nodes.forEach(n => { n.x = n.x/g.W*VW; n.y = n.y/g.H*VH; n.vx=0; n.vy=0; });
-
-  // Legend
-  const mods = [...new Set(data.results.filter(r=>r.findings.length).map(r=>r.module))];
-  document.getElementById("legend").innerHTML =
-    `<div><span class="legend-dot" style="background:#fff"></span>Target</div>` +
-    mods.map(m=>`<div><span class="legend-dot" style="background:${MODULE_COLORS[m]||'#8b949e'}"></span>${m}</div>`).join("") +
-    `<div><span class="legend-dot" style="background:#d29922"></span>correlated</div>`;
-
-  graphState = { g, canvas, ctx, VW, VH, drag:null, hover:null };
-  setupGraphInteraction();
-  runSimulation();
-}
-
-function runSimulation() {
-  const s = graphState; if (!s) return;
-  const { g, VW, VH } = s;
-  let ticks = 0;
-  function step() {
-    if (!graphState) return;
-    // Forces: node repulsion + link attraction + centering
-    for (const n of g.nodes) { if (n===s.drag) continue; n.fx=0; n.fy=0; }
-    for (let i=0;i<g.nodes.length;i++){
-      for (let j=i+1;j<g.nodes.length;j++){
-        const a=g.nodes[i], b=g.nodes[j];
-        let dx=a.x-b.x, dy=a.y-b.y, d=Math.hypot(dx,dy)||0.1;
-        const rep = 1400/(d*d);
-        const fx=dx/d*rep, fy=dy/d*rep;
-        a.fx+=fx; a.fy+=fy; b.fx-=fx; b.fy-=fy;
-      }
-    }
-    for (const l of g.links){
-      const a=g.nodes.find(n=>n.id===l.source), b=g.nodes.find(n=>n.id===l.target);
-      let dx=b.x-a.x, dy=b.y-a.y, d=Math.hypot(dx,dy)||0.1;
-      const target = l.strong?90:55;
-      const k=(d-target)*0.02;
-      const fx=dx/d*k, fy=dy/d*k;
-      a.fx+=fx; a.fy+=fy; b.fx-=fx; b.fy-=fy;
-    }
-    for (const n of g.nodes){
-      if (n===s.drag) continue;
-      n.fx += (VW/2 - n.x)*0.005; n.fy += (VH/2 - n.y)*0.005;
-      n.vx=(n.vx+n.fx)*0.85; n.vy=(n.vy+n.fy)*0.85;
-      n.x+=n.vx; n.y+=n.vy;
-      n.x=Math.max(n.r, Math.min(VW-n.r, n.x));
-      n.y=Math.max(n.r, Math.min(VH-n.r, n.y));
-    }
-    drawGraph();
-    ticks++;
-    if (ticks < 500) requestAnimationFrame(step);
-  }
-  step();
-}
-
-function drawGraph() {
-  const s = graphState; if (!s) return;
-  const { ctx, g, VW, VH } = s;
-  ctx.clearRect(0,0,VW,VH);
-  // links
-  for (const l of g.links){
-    const a=g.nodes.find(n=>n.id===l.source), b=g.nodes.find(n=>n.id===l.target);
-    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
-    ctx.strokeStyle = l.corr ? "rgba(210,153,34,.6)" : (l.strong?"rgba(139,148,158,.5)":"rgba(139,148,158,.2)");
-    ctx.lineWidth = l.strong?2:1; ctx.stroke();
-  }
-  // nodos
-  for (const n of g.nodes){
-    ctx.beginPath(); ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
-    ctx.fillStyle=n.color; ctx.fill();
-    if (n.type==="target"){ ctx.lineWidth=3; ctx.strokeStyle="#2f81f7"; ctx.stroke(); }
-    if (n.corr){ ctx.lineWidth=2; ctx.strokeStyle="#fff"; ctx.stroke(); }
-    // label only for target and modules
-    if (n.type!=="finding"){
-      ctx.fillStyle="#e6edf3"; ctx.font=(n.type==="target"?"bold 13px":"12px")+" sans-serif";
-      ctx.textAlign="center";
-      const lbl = n.label.length>22 ? n.label.slice(0,22)+"…" : n.label;
-      ctx.fillText(lbl, n.x, n.y - n.r - 6);
-    }
-  }
-}
-
-function setupGraphInteraction() {
-  const s = graphState; const { canvas, g } = s;
-  const tooltip = document.getElementById("tooltip");
-  function pos(e){ const r=canvas.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; }
-  function nodeAt(p){ for (let i=g.nodes.length-1;i>=0;i--){ const n=g.nodes[i]; if (Math.hypot(n.x-p.x,n.y-p.y)<=n.r+3) return n; } return null; }
-
-  canvas.onmousedown = e => { const p=pos(e); const n=nodeAt(p); if (n){ s.drag=n; n.vx=0; n.vy=0; } };
-  canvas.onmousemove = e => {
-    const p=pos(e);
-    if (s.drag){ s.drag.x=p.x; s.drag.y=p.y; drawGraph(); }
-    const n=nodeAt(p);
-    if (n && n.type==="finding"){
-      tooltip.style.display="block"; tooltip.style.left=(p.x+12)+"px"; tooltip.style.top=(p.y+12)+"px";
-      tooltip.innerHTML = `<b>${escapeHtml(n.sub||"")}</b><br>${escapeHtml(n.label)}`;
-    } else tooltip.style.display="none";
-  };
-  canvas.onmouseup = () => { s.drag=null; runSimulation(); };
-  canvas.onmouseleave = () => { s.drag=null; tooltip.style.display="none"; };
-}
-
-/* ---------- helpers ---------- */
-function statusLabel(r){ if(r.status==="ok")return `${r.findings.length} results`; if(r.status==="empty")return "no results"; return "error"; }
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function linkify(v){ const safe=escapeHtml(v); if(/^https?:\/\//.test(v))return `<a href="${safe}" target="_blank" rel="noopener">${safe}</a>`; return safe; }
-
-/* ---------- BACKGROUND: animated node network (Ariadne thread) ---------- */
-(function backgroundNetwork() {
-  const canvas = document.getElementById("bg-canvas");
-  const ctx = canvas.getContext("2d");
-  const PALETTE = ["#2f81f7", "#bc8cff", "#39c5cf", "#3fb950"];
-  let W, H, dpr, nodes = [], mouse = { x: -9999, y: -9999 };
-
-  function resize() {
-    dpr = window.devicePixelRatio || 1;
-    W = window.innerWidth; H = window.innerHeight;
-    canvas.width = W * dpr; canvas.height = H * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // Densidad proporcional al área (acotada)
-    const count = Math.min(90, Math.max(38, Math.round((W * H) / 22000)));
-    nodes = Array.from({ length: count }, () => ({
-      x: Math.random() * W, y: Math.random() * H,
-      vx: (Math.random() - .5) * .25, vy: (Math.random() - .5) * .25,
-      r: Math.random() * 1.6 + 1,
-      c: PALETTE[(Math.random() * PALETTE.length) | 0],
-    }));
-  }
-
-  function tick() {
-    ctx.clearRect(0, 0, W, H);
-    const LINK = 140;
-    for (const n of nodes) {
-      n.x += n.vx; n.y += n.vy;
-      if (n.x < 0 || n.x > W) n.vx *= -1;
-      if (n.y < 0 || n.y > H) n.vy *= -1;
-      // atracción sutil hacia el cursor (traza el hilo)
-      const mdx = mouse.x - n.x, mdy = mouse.y - n.y, md = Math.hypot(mdx, mdy);
-      if (md < 180) { n.x += mdx / md * .4; n.y += mdy / md * .4; }
-    }
-    // hilos entre nodos cercanos
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const a = nodes[i], b = nodes[j];
-        const d = Math.hypot(a.x - b.x, a.y - b.y);
-        if (d < LINK) {
-          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
-          ctx.strokeStyle = `rgba(139,148,158,${(1 - d / LINK) * .28})`;
-          ctx.lineWidth = 1; ctx.stroke();
-        }
-      }
-    }
-    // nodos
-    for (const n of nodes) {
-      ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-      ctx.fillStyle = n.c; ctx.globalAlpha = .85; ctx.fill(); ctx.globalAlpha = 1;
-    }
-    requestAnimationFrame(tick);
-  }
-
-  window.addEventListener("resize", resize);
-  window.addEventListener("mousemove", e => { mouse.x = e.clientX; mouse.y = e.clientY; });
-  window.addEventListener("mouseout", () => { mouse.x = -9999; mouse.y = -9999; });
-  resize(); tick();
-})();
-
-/* ---------- INIT ---------- */
-populateCountryCodes();
-renderTypePicker();
-</script>
+<script type="module" src="assets/app.js"></script>
 </body>
 </html>

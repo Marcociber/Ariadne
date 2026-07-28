@@ -1,9 +1,28 @@
+# Core API
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
+pydantic==2.9.2
+pydantic-settings==2.5.2      # typed settings + .env loading (see app/core/config.py)
+
+# HTTP / DNS / parsing
 httpx==0.27.2
 dnspython==2.6.1
+selectolax==0.4.11            # real HTML parsing (replaces regex scraping)
+tldextract==5.1.2             # Public Suffix List: correct subdomain/domain/suffix split
+tenacity==9.0.0               # declarative retries with backoff for HTTP sources
+
+# Sources
 python-whois==0.9.4
 phonenumbers==8.13.45
-pydantic==2.9.2
-maigret==0.6.2
-redis==5.0.8          # optional: scan-result cache (no-op if REDIS_URL is unset)
+maigret==0.6.2                # optional at runtime: the username module degrades if missing
+
+# API hardening / observability
+slowapi==0.1.9                # rate limiting
+sse-starlette==2.1.3          # Server-Sent Events for streaming scan progress
+structlog==24.4.0             # structured application logging
+
+# Correlation
+rapidfuzz==3.9.7              # fast fuzzy matching for entity resolution
+
+# Optional infrastructure
+redis==5.0.8                  # optional: scan-result cache (no-op if REDIS_URL is unset)

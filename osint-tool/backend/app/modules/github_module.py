@@ -8,16 +8,18 @@ GitHub module (free, no API key required):
 Only public data returned by GitHub's own API — no scraping, no guesswork.
 Runs on the `username` target type alongside Maigret, adding depth for one
 of the most common OSINT pivots.
+
+Rate limiting is reported explicitly: a 403/429 used to return an empty list,
+so "GitHub is throttling us" looked exactly like "this user does not exist".
 """
+
 import httpx
 
 from ..core.base import OSINTModule, register
 from ..core.models import Finding, TargetType
+from ..core.net import get_client
 
-_HEADERS = {
-    "User-Agent": "osint-tool",
-    "Accept": "application/vnd.github+json",
-}
+_HEADERS = {"Accept": "application/vnd.github+json"}
 
 
 @register
@@ -30,41 +32,68 @@ class GitHubModule(OSINTModule):
         if not user:
             return []
 
-        async with httpx.AsyncClient(timeout=10.0, headers=_HEADERS) as client:
-            resp = await client.get(f"https://api.github.com/users/{user}")
-            # 404 = no such user; 403 = rate-limited. Either way, no data.
-            if resp.status_code != 200:
-                return []
-            data = resp.json()
-            repos: list[dict] = []
-            try:
-                r2 = await client.get(
-                    f"https://api.github.com/users/{user}/repos",
-                    params={"sort": "pushed", "per_page": 5},
-                )
-                if r2.status_code == 200:
-                    repos = r2.json()
-            except httpx.HTTPError:
-                pass
+        client = get_client()
+        resp = await client.get(f"https://api.github.com/users/{user}", headers=_HEADERS)
 
-        if data.get("type") and data["type"] != "User":
-            kind = data["type"]  # Organization / Bot
-        else:
-            kind = "User"
+        if resp.status_code in (403, 429):
+            # Distinguish throttling from "no such user" — otherwise the user
+            # cannot tell why there are no results.
+            reset = resp.headers.get("x-ratelimit-reset")
+            detail = "GitHub API rate limit reached (60 requests/hour unauthenticated)"
+            if reset:
+                detail += f"; resets at epoch {reset}"
+            return [Finding(label="GitHub lookup", value=detail, category="social", confidence=0.9)]
+        if resp.status_code == 404:
+            return [
+                Finding(
+                    label="GitHub account",
+                    value="No public account with this username",
+                    category="social",
+                    confidence=0.9,
+                )
+            ]
+        if resp.status_code != 200:
+            return [
+                Finding(
+                    label="GitHub lookup",
+                    value=f"Unexpected API response ({resp.status_code})",
+                    category="social",
+                    confidence=0.8,
+                )
+            ]
+
+        data = resp.json()
+        repos: list[dict] = []
+        try:
+            r2 = await client.get(
+                f"https://api.github.com/users/{user}/repos",
+                headers=_HEADERS,
+                params={"sort": "pushed", "per_page": 5},
+            )
+            if r2.status_code == 200:
+                repos = r2.json()
+        except httpx.HTTPError:
+            pass
+
+        kind = data["type"] if data.get("type") and data["type"] != "User" else "User"
 
         findings: list[Finding] = [
-            Finding(label="GitHub profile", value=data.get("html_url", f"https://github.com/{user}"), category="social", confidence=0.95),
+            Finding(
+                label="GitHub profile",
+                value=data.get("html_url", f"https://github.com/{user}"),
+                category="social",
+                confidence=0.95,
+            ),
             Finding(label="Account type", value=kind, category="social"),
         ]
 
-        def add(label, key, category="social", link=False):
-            v = data.get(key)
-            if v:
-                findings.append(Finding(label=label, value=str(v), category=category))
+        def add(label: str, key: str, category: str = "social") -> None:
+            value = data.get(key)
+            if value:
+                findings.append(Finding(label=label, value=str(value), category=category))
 
         add("Name", "name")
-        if data.get("company"):
-            findings.append(Finding(label="Company", value=data["company"], category="social"))
+        add("Company", "company")
         add("Location", "location", category="geo")
         if data.get("bio"):
             findings.append(Finding(label="Bio", value=str(data["bio"])[:200], category="social"))
@@ -74,24 +103,41 @@ class GitHubModule(OSINTModule):
                 blog = "https://" + blog
             findings.append(Finding(label="Website", value=blog, category="social"))
         if data.get("twitter_username"):
-            findings.append(Finding(
-                label="Twitter / X", value=f"https://twitter.com/{data['twitter_username']}",
-                category="social"))
+            findings.append(
+                Finding(
+                    label="Twitter / X",
+                    value=f"https://twitter.com/{data['twitter_username']}",
+                    category="social",
+                )
+            )
         if data.get("email"):
-            findings.append(Finding(label="Public email", value=data["email"], category="social", confidence=0.9))
+            findings.append(
+                Finding(label="Public email", value=data["email"], category="social", confidence=0.9)
+            )
 
         # Activity signals (real counts from the API).
-        for label, key in (("Public repositories", "public_repos"),
-                            ("Public gists", "public_gists"),
-                            ("Followers", "followers"),
-                            ("Following", "following")):
+        for label, key in (
+            ("Public repositories", "public_repos"),
+            ("Public gists", "public_gists"),
+            ("Followers", "followers"),
+            ("Following", "following"),
+        ):
             if data.get(key) is not None:
                 findings.append(Finding(label=label, value=str(data[key]), category="activity"))
 
         if data.get("created_at"):
-            findings.append(Finding(label="Account created", value=data["created_at"][:10], category="activity"))
+            findings.append(
+                Finding(label="Account created", value=data["created_at"][:10], category="activity")
+            )
         if data.get("updated_at"):
-            findings.append(Finding(label="Last activity", value=data["updated_at"][:10], category="activity", confidence=0.8))
+            findings.append(
+                Finding(
+                    label="Last activity",
+                    value=data["updated_at"][:10],
+                    category="activity",
+                    confidence=0.8,
+                )
+            )
 
         # Most recently pushed repos — a quick view of what they work on.
         for repo in repos[:5]:
@@ -102,6 +148,13 @@ class GitHubModule(OSINTModule):
             stars = repo.get("stargazers_count", 0)
             extra = " · ".join(filter(None, [lang, f"★{stars}" if stars else None]))
             label = f"Repo {name}" + (f" ({extra})" if extra else "")
-            findings.append(Finding(label=label, value=repo.get("html_url", ""), category="repo", confidence=0.9))
+            findings.append(
+                Finding(
+                    label=label,
+                    value=repo.get("html_url", ""),
+                    category="repo",
+                    confidence=0.9,
+                )
+            )
 
         return findings

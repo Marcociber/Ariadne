@@ -6,14 +6,26 @@ a thread because the library is synchronous/blocking).
 Values are deduplicated (case-insensitive) to avoid repeating nameservers
 or emails that the record returns in different capitalizations — reduces
 noise without inventing data.
+
+TIMEOUT: python-whois opens a raw socket to the registry and has no timeout
+of its own, so an unresponsive WHOIS server used to keep the whole scan
+waiting forever. The lookup is now bounded by WHOIS_TIMEOUT. The worker
+thread cannot be killed (that is a limitation of the blocking library), but
+it no longer holds the request open — this is also why the structured `rdap`
+module exists alongside this one.
 """
+
 import asyncio
-from datetime import datetime, date
+from datetime import date, datetime
 
 import whois
 
 from ..core.base import OSINTModule, register
+from ..core.config import settings
+from ..core.logging import get_logger
 from ..core.models import Finding, TargetType
+
+log = get_logger("whois")
 
 
 def _fmt(v) -> str:
@@ -29,6 +41,11 @@ def _fmt(v) -> str:
 class WhoisModule(OSINTModule):
     name = "whois"
     supported_types = [TargetType.DOMAIN]
+
+    @property
+    def timeout(self) -> float:  # type: ignore[override]
+        # Slightly above the inner timeout so the inner one reports first.
+        return settings.whois_timeout + 5
 
     def _sync_lookup(self, domain: str) -> list[Finding]:
         data = whois.whois(domain)
@@ -75,10 +92,12 @@ class WhoisModule(OSINTModule):
                     years = age_days // 365
                     rem = (age_days % 365) // 30
                     add("Domain age", f"{years}y {rem}m ({age_days} days)")
-            except Exception:
-                pass
+            except (TypeError, ValueError, OverflowError) as exc:
+                # WHOIS text formats vary per TLD; a bad date must be visible
+                # in the logs instead of vanishing into `except: pass`.
+                log.debug("whois.age_parse_failed", domain=domain, error=str(exc))
 
-        # Días hasta expiración: dato derivado y fiable (o el dominio ya caducó).
+        # Days until expiration: derived and reliable (or the domain lapsed).
         exp = data.expiration_date
         if isinstance(exp, list):
             exp = exp[0] if exp else None
@@ -89,8 +108,8 @@ class WhoisModule(OSINTModule):
                     add("Days until expiration", str(days))
                 else:
                     add("Domain status", f"EXPIRED ({abs(days)} days ago)")
-            except Exception:
-                pass
+            except (TypeError, ValueError, OverflowError) as exc:
+                log.debug("whois.expiry_parse_failed", domain=domain, error=str(exc))
 
         add("Status (EPP)", getattr(data, "status", None))
         add("DNSSEC", getattr(data, "dnssec", None))
@@ -105,5 +124,19 @@ class WhoisModule(OSINTModule):
         return findings
 
     async def _run(self, target: str) -> list[Finding]:
-        # python-whois is blocking: run it in a thread.
-        return await asyncio.to_thread(self._sync_lookup, target)
+        # python-whois is blocking: run it in a thread, under a hard deadline.
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(self._sync_lookup, target),
+                timeout=settings.whois_timeout,
+            )
+        except TimeoutError:
+            log.warning("whois.timeout", domain=target, limit=settings.whois_timeout)
+            return [
+                Finding(
+                    label="WHOIS",
+                    value=f"No answer from the registry within {settings.whois_timeout}s",
+                    category="whois",
+                    confidence=0.9,
+                )
+            ]
