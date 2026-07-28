@@ -182,6 +182,8 @@ cp osint-tool/backend/.env.example osint-tool/backend/.env
 | `HISTORY_DB` | `ariadne_history.db` | SQLite file for the scan history |
 | `HISTORY_MAX_ROWS` / `HISTORY_RETENTION_DAYS` | `5000` / `90` | Retention policy, so the table cannot grow without bound |
 | `SCAN_TIMEOUT` / `MODULE_TIMEOUT` / `WHOIS_TIMEOUT` | `120` / `60` / `20` | Hard deadlines, in seconds |
+| `GEO_PROVIDER_TIMEOUT` | `4.0` | Per-source budget in the IP geolocation consensus, so one stalled provider cannot hold the whole scan |
+| `DOH_TIMEOUT` | `3.0` | Per-endpoint budget for the DNS-over-HTTPS resolver fallback |
 | `MAX_CONCURRENT_SCANS` | `4` | Simultaneous scans allowed |
 | `MAIGRET_TOP_SITES` / `MAIGRET_TIMEOUT` | `75` / `10` | Username coverage vs. speed — the main driver of scan time |
 | `CORS_ORIGINS` | `*` | Comma-separated browser origins allowed to call the API |

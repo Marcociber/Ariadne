@@ -31,9 +31,12 @@ import httpx
 
 from ..core.base import OSINTModule, register
 from ..core.config import settings
+from ..core.logging import get_logger
 from ..core.models import Finding, TargetType
 from ..core.net import get_client
 from ..core.resolver import reverse
+
+log = get_logger("ip")
 
 # Fields we ask ip-api for (some, like reverse/mobile/proxy, are opt-in).
 _IPAPI_FIELDS = (
@@ -195,6 +198,23 @@ class IPModule(OSINTModule):
             "timezone": d.get("time_zone"),
         }
 
+    async def _query(self, provider, client: httpx.AsyncClient, ip: str) -> dict | None:
+        """Run one geolocation provider under its own budget.
+
+        The consensus is only as fast as its slowest member, so a provider
+        that stalls used to hold the whole scan for the full HTTP_TIMEOUT even
+        when the other three had already answered. An unexpected exception was
+        just as costly: it propagated out of the `gather` and lost the
+        geolocation entirely instead of one source out of four.
+        """
+        try:
+            return await asyncio.wait_for(provider(client, ip), settings.geo_provider_timeout)
+        except TimeoutError:
+            log.debug("ip.provider_timeout", provider=provider.__name__, ip=ip)
+        except Exception as exc:
+            log.debug("ip.provider_failed", provider=provider.__name__, error=str(exc))
+        return None
+
     async def _geolocate(self, ip: str) -> list[Finding]:
         client = get_client()
         providers = [self._from_ipwho, self._from_geojs, self._from_rfg]
@@ -202,7 +222,7 @@ class IPModule(OSINTModule):
         if settings.enable_insecure_ipapi:
             providers.insert(0, self._from_ipapi)
 
-        recs = await asyncio.gather(*(p(client, ip) for p in providers))
+        recs = await asyncio.gather(*(self._query(p, client, ip) for p in providers))
         sources = [r for r in recs if r]
         if not sources:
             return []
@@ -363,8 +383,15 @@ class IPModule(OSINTModule):
             is_global = ipaddress.ip_address(ip).is_global
         except ValueError:
             is_global = False
+
+        # Geolocation (HTTP) and the PTR lookup (DNS) share nothing, so they
+        # run at the same time. Awaiting them in sequence made the module cost
+        # the SUM of their worst cases instead of the larger of the two.
         if is_global:
-            findings += await self._geolocate(ip)
-        findings += await self._reverse_dns(ip)
+            geo, ptr = await asyncio.gather(self._geolocate(ip), self._reverse_dns(ip))
+        else:
+            geo, ptr = [], await self._reverse_dns(ip)
+
+        findings += geo + ptr
         findings += self._pivots(ip)
         return findings

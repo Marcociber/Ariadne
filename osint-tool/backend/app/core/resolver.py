@@ -23,6 +23,7 @@ import dns.resolver
 import dns.reversename
 import httpx
 
+from .config import settings
 from .logging import get_logger
 from .net import get_client
 
@@ -66,7 +67,7 @@ async def _resolve_doh(name: str, rtype: str) -> list[str]:
                 endpoint,
                 params={"name": name, "type": rtype},
                 headers={"Accept": "application/dns-json"},
-                timeout=5.0,
+                timeout=settings.doh_timeout,
             )
             if resp.status_code != 200:
                 continue
@@ -95,7 +96,15 @@ async def resolve(name: str, rtype: str, *, allow_doh: bool = True) -> list[str]
         if not allow_doh:
             return []
         log.debug("resolver.local_failed", name=name, rtype=rtype, error=type(exc).__name__)
-        return await _resolve_doh(name, rtype)
+        # The endpoints are tried in order, so a hard cap on the whole fallback
+        # is what keeps the cost bounded: this path is only reached after the
+        # local resolver has ALREADY burned its own lifetime.
+        budget = settings.doh_timeout * len(_DOH_ENDPOINTS)
+        try:
+            return await asyncio.wait_for(_resolve_doh(name, rtype), timeout=budget)
+        except TimeoutError:
+            log.debug("resolver.doh_budget_exceeded", name=name, rtype=rtype, budget=budget)
+            return []
     except dns.exception.SyntaxError:
         return []
     return [str(rdata) for rdata in answers]

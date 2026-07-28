@@ -54,11 +54,22 @@ class Settings(BaseSettings):
     module_timeout: int = 60
     whois_timeout: int = 20
     http_timeout: float = 10.0
+    # Per-source budget for the IP geolocation consensus. The module queries
+    # four providers at once, so without this one stalled provider held the
+    # whole consensus for the full HTTP_TIMEOUT even when the other three had
+    # already answered.
+    geo_provider_timeout: float = 4.0
     max_target_length: int = 253
     # How many scans may run at the same time. One username scan alone fans
     # out to ~150 outbound requests, so unbounded concurrency turns the API
     # into a traffic amplifier against third parties.
     max_concurrent_scans: int = 4
+
+    # ---------- DNS ----------
+    # Budget per DNS-over-HTTPS endpoint in the resolver fallback. The whole
+    # fallback is capped at this times the number of endpoints, so a resolver
+    # that never answers costs seconds rather than tens of seconds.
+    doh_timeout: float = 3.0
 
     # ---------- username module (Maigret) ----------
     # Lowered from 150: this single number drives the perceived latency of the
