@@ -40,7 +40,7 @@ Open-source intelligence dashboard that aggregates **multiple free sources** int
 | Username   | `username`| Presence on many platforms via **Maigret** (real detection) + **profile count**. Site count configurable globally and per scan |
 | Username   | `github`  | Public **GitHub profile** (name, bio, company, location, blog, Twitter), activity (repos, gists, followers, created/last-active dates) and **recent repositories** — GitHub's own API, no key. Rate limiting is reported explicitly instead of looking like "no such user" |
 | Phone      | `phone`   | Validity, formats (E.164/intl/national), country + **flag**, region, **carrier** (mobile only), timezone, line type, length, and **pivot links** (WhatsApp/Telegram/Truecaller/**Sync.me**/**Facebook**/search) filtered by line type |
-| IP         | `ip`      | Address scope (public/private/reserved), **multi-source geolocation by consensus** (ip-api.com + ipwho.is + geojs.io + reallyfreegeoip.org — agreement raises confidence, coordinate spread flags approximate fixes), ISP/**ASN**, **reverse DNS (PTR)**, mobile/proxy/hosting flags, and reputation **pivots** (Shodan/Censys/VirusTotal/AbuseIPDB/GreyNoise) |
+| IP         | `ip`      | Address scope (public/private/reserved), **multi-source geolocation by consensus** (ip-api.com + ipwho.is + geojs.io + reallyfreegeoip.org, plus the offline **MaxMind GeoLite2** when its database is installed — agreement raises confidence, coordinate spread flags approximate fixes), an **accuracy radius** in km (MaxMind's honest bound — an IP resolves to a radius of kilometres, never a street address), ISP/**ASN**, **reverse DNS (PTR)**, mobile/proxy/hosting flags, and reputation **pivots** (Shodan/Censys/VirusTotal/AbuseIPDB/GreyNoise) |
 
 > **Key-based modules** (`shodan`, `hibp`) are already included as optional plugins — they activate automatically when you set their API key. See [Optional key-based modules](#-optional-key-based-modules).
 
@@ -191,6 +191,7 @@ cp osint-tool/backend/.env.example osint-tool/backend/.env
 | `RATE_LIMIT` / `SCAN_RATE_LIMIT` | `60/minute` / `10/minute` | Per-client request limits |
 | `ALLOW_PRIVATE_TARGETS` | `false` | Lets modules fetch private/reserved addresses. Only on an isolated network |
 | `ENABLE_INSECURE_IPAPI` | `true` | ip-api.com is HTTP-only on its free plan; set `false` to drop it |
+| `GEOIP_CITY_DB` / `GEOIP_ASN_DB` | unset | Paths to local MaxMind GeoLite2 `.mmdb` files. When set, GeoLite2 joins the consensus as an offline source that reports an **accuracy radius** |
 | `LOG_LEVEL` / `LOG_JSON` | `INFO` / `false` | Structured logging (JSON for log collectors) |
 
 ### 🛡️ Before exposing the API to a network

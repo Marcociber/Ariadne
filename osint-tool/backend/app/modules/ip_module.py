@@ -1,11 +1,15 @@
 """
 IP module (free, no API key required):
     - Geolocation by CONSENSUS across several free, key-less providers
-      (ip-api.com, ipwho.is, geojs.io, reallyfreegeoip.org). Each field
+      (ip-api.com, ipwho.is, geojs.io, reallyfreegeoip.org, and — when its
+      local database is installed — the offline MaxMind GeoLite2). Each field
       (country, region,
       city, coordinates) is a majority vote: agreement raises confidence,
       disagreement is surfaced and the coordinate spread is reported so an
       approximate fix is never presented as exact.
+    - Accuracy radius: MaxMind states, in km, how far off its fix may be. This
+      is the honest precision headline — an IP resolves to a radius of
+      kilometres, never to a street address, and the scan says so.
     - Network ownership: ISP, organization and ASN (authoritative RIR data).
     - Reverse DNS (PTR) via dnspython.
     - Classification for private / reserved / loopback ranges (offline).
@@ -43,6 +47,43 @@ _IPAPI_FIELDS = (
     "status,message,country,countryCode,regionName,city,"
     "zip,lat,lon,timezone,isp,org,as,asname,reverse,mobile,proxy,hosting"
 )
+
+# Lazily-opened GeoLite2 readers, shared for the whole process (the .mmdb is
+# memory-mapped, so opening it once and reusing it is both correct and cheap).
+# `_geoip_loaded` records that we already tried, so a missing file/library is
+# not re-probed on every scan.
+_geoip_city_reader = None
+_geoip_asn_reader = None
+_geoip_loaded = False
+
+
+def _get_geoip_readers():
+    """Open the GeoLite2 City/ASN readers once. Either may be None.
+
+    A missing `geoip2` library or a missing/unreadable database disables the
+    source cleanly — the free, offline-by-default setup is unchanged, exactly
+    as an unset API key skips a key-based module.
+    """
+    global _geoip_city_reader, _geoip_asn_reader, _geoip_loaded
+    if _geoip_loaded:
+        return _geoip_city_reader, _geoip_asn_reader
+    _geoip_loaded = True
+    try:
+        import geoip2.database
+    except ImportError:
+        log.debug("ip.geoip2_not_installed")
+        return None, None
+    for path, attr in (
+        (settings.geoip_city_db, "_geoip_city_reader"),
+        (settings.geoip_asn_db, "_geoip_asn_reader"),
+    ):
+        if not path:
+            continue
+        try:
+            globals()[attr] = geoip2.database.Reader(path)
+        except (OSError, ValueError) as exc:
+            log.warning("ip.geoip_db_unavailable", path=path, error=str(exc))
+    return _geoip_city_reader, _geoip_asn_reader
 
 
 def _haversine(a: tuple[float, float], b: tuple[float, float]) -> float:
@@ -215,12 +256,72 @@ class IPModule(OSINTModule):
             log.debug("ip.provider_failed", provider=provider.__name__, error=str(exc))
         return None
 
+    def _maxmind_lookup(self, city_reader, asn_reader, ip: str) -> dict | None:
+        """Blocking GeoLite2 lookup (runs in a thread via `_from_maxmind`)."""
+        import geoip2.errors
+
+        rec: dict = {"source": "MaxMind GeoLite2"}
+        if city_reader is not None:
+            try:
+                c = city_reader.city(ip)
+            except geoip2.errors.AddressNotFoundError:
+                c = None
+            if c is not None:
+                rec.update(
+                    {
+                        "country": c.country.name,
+                        "country_code": c.country.iso_code,
+                        "region": c.subdivisions.most_specific.name,
+                        "city": c.city.name,
+                        "postal": c.postal.code,
+                        "lat": c.location.latitude,
+                        "lon": c.location.longitude,
+                        "timezone": c.location.time_zone,
+                        # MaxMind's own honest bound on the fix, in km. This is
+                        # the whole point of the source: a stated radius instead
+                        # of an implied point.
+                        "accuracy_radius": c.location.accuracy_radius,
+                    }
+                )
+        if asn_reader is not None:
+            try:
+                a = asn_reader.asn(ip)
+            except geoip2.errors.AddressNotFoundError:
+                a = None
+            if a is not None:
+                num = a.autonomous_system_number
+                org = a.autonomous_system_organization
+                rec["asn"] = f"AS{num} {org or ''}".strip() if num else None
+                rec["isp"] = org
+                rec["org"] = org
+        # Return only when the lookup actually located or attributed the IP.
+        return rec if (rec.get("country") or rec.get("asn")) else None
+
+    async def _from_maxmind(self, client: httpx.AsyncClient, ip: str) -> dict | None:
+        """Offline GeoLite2 lookup.
+
+        Two things set this source apart from the HTTP providers: it never
+        sends the target IP anywhere (the database is read locally), and it is
+        the only source that reports an accuracy radius.
+        """
+        city_reader, asn_reader = _get_geoip_readers()
+        if city_reader is None and asn_reader is None:
+            return None
+        try:
+            return await asyncio.to_thread(self._maxmind_lookup, city_reader, asn_reader, ip)
+        except Exception as exc:
+            log.debug("ip.maxmind_failed", error=str(exc))
+            return None
+
     async def _geolocate(self, ip: str) -> list[Finding]:
         client = get_client()
         providers = [self._from_ipwho, self._from_geojs, self._from_rfg]
         # ip-api.com is HTTP-only on the free plan: opt-out available.
         if settings.enable_insecure_ipapi:
             providers.insert(0, self._from_ipapi)
+        # Offline, privacy-preserving, and the only source with an accuracy
+        # radius. Cheap to include: it returns None when no database is set up.
+        providers.append(self._from_maxmind)
 
         recs = await asyncio.gather(*(self._query(p, client, ip) for p in providers))
         sources = [r for r in recs if r]
@@ -322,6 +423,23 @@ class IPModule(OSINTModule):
                     value=f"https://www.openstreetmap.org/?mlat={clat:.4f}&mlon={clon:.4f}#map=11/{clat:.4f}/{clon:.4f}",
                     category="pivot",
                     confidence=0.6,
+                )
+            )
+
+        # --- Accuracy radius (MaxMind only) ---
+        # The honest headline: how far off the fix can be. Stating it is what
+        # stops a city-level guess from reading like a street address — an IP
+        # never resolves to metres, only to a radius of kilometres.
+        mm = next((r for r in sources if r["source"] == "MaxMind GeoLite2"), {})
+        radius = mm.get("accuracy_radius")
+        if radius:
+            findings.append(
+                Finding(
+                    label="Accuracy radius (MaxMind)",
+                    value=f"~{radius} km — the real location is somewhere within this radius, "
+                    "not the exact point above (IP geolocation cannot pinpoint an address)",
+                    category="geo",
+                    confidence=0.8,
                 )
             )
 

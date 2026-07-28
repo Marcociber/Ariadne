@@ -17,6 +17,11 @@ services:
         required: false
     volumes:
       - ariadne-data:/data
+      # Optional: mount local MaxMind GeoLite2 databases to add an offline
+      # geolocation source with an accuracy radius. Then set GEOIP_CITY_DB
+      # (and optionally GEOIP_ASN_DB) in backend/.env to these paths.
+      # - ./geoip/GeoLite2-City.mmdb:/data/GeoLite2-City.mmdb:ro
+      # - ./geoip/GeoLite2-ASN.mmdb:/data/GeoLite2-ASN.mmdb:ro
     depends_on:
       redis:
         condition: service_healthy

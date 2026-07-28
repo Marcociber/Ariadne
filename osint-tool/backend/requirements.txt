@@ -21,6 +21,10 @@ slowapi==0.1.9                # rate limiting
 sse-starlette==2.1.3          # Server-Sent Events for streaming scan progress
 structlog==24.4.0             # structured application logging
 
+# Geolocation
+geoip2==4.8.0                # offline MaxMind GeoLite2 reader; adds an accuracy
+                             #   radius to IP scans. No-op until a .mmdb is set
+
 # Correlation
 rapidfuzz==3.9.7              # fast fuzzy matching for entity resolution
 

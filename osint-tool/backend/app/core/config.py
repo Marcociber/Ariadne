@@ -97,6 +97,16 @@ class Settings(BaseSettings):
     # IP in cleartext. Disable to drop that source from the consensus.
     enable_insecure_ipapi: bool = True
 
+    # ---------- IP geolocation: offline MaxMind GeoLite2 ----------
+    # Optional local databases. When present, GeoLite2 joins the geolocation
+    # consensus as an OFFLINE source with two properties the HTTP providers
+    # lack: it reports MaxMind's own ACCURACY RADIUS (an honest bound on how
+    # precise the fix is, in km) and it never sends the target IP over the
+    # network. Absent files simply drop the source, exactly like an unset key.
+    # Download the .mmdb files from a free MaxMind account and point these here.
+    geoip_city_db: str | None = None
+    geoip_asn_db: str | None = None
+
     # ---------- logging ----------
     log_level: str = "INFO"
     log_json: bool = False
