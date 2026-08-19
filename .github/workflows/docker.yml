@@ -21,7 +21,7 @@ jobs:
       - uses: docker/setup-buildx-action@v4
 
       - name: Build the image (loaded locally for scanning)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./osint-tool/backend
           load: true
@@ -52,7 +52,7 @@ jobs:
 
       - name: Push to GHCR
         if: github.event_name == 'push'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./osint-tool/backend
           push: true
