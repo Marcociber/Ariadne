@@ -12,7 +12,7 @@ tldextract==5.1.2             # Public Suffix List: correct subdomain/domain/suf
 tenacity==9.0.0               # declarative retries with backoff for HTTP sources
 
 # Sources
-python-whois==0.9.4
+python-whois==0.9.6
 phonenumbers==8.13.45
 maigret==0.6.3                # optional at runtime: the username module degrades if missing
 
