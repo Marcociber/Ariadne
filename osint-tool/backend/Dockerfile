@@ -5,7 +5,7 @@
 # (fully reproducible), resolve it once and replace the tag:
 #   docker buildx imagetools inspect python:3.12.6-slim
 #   FROM python:3.12.6-slim@sha256:<digest>
-FROM python:3.12.6-slim AS builder
+FROM python:3.14.7-slim AS builder
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
@@ -19,7 +19,7 @@ RUN python -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 
-FROM python:3.12.6-slim
+FROM python:3.14.7-slim
 
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
