@@ -13,7 +13,7 @@ tenacity==9.0.0               # declarative retries with backoff for HTTP source
 
 # Sources
 python-whois==0.9.6
-phonenumbers==8.13.45
+phonenumbers==9.0.37
 maigret==0.6.3                # optional at runtime: the username module degrades if missing
 
 # API hardening / observability
