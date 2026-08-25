@@ -26,7 +26,7 @@ geoip2==4.8.0                # offline MaxMind GeoLite2 reader; adds an accuracy
                              #   radius to IP scans. No-op until a .mmdb is set
 
 # Correlation
-rapidfuzz==3.9.7              # fast fuzzy matching for entity resolution
+rapidfuzz==3.14.5              # fast fuzzy matching for entity resolution
 
 # Optional infrastructure
 redis==5.0.8                  # optional: scan-result cache (no-op if REDIS_URL is unset)
